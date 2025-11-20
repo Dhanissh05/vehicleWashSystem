@@ -1,0 +1,695 @@
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  TouchableOpacity,
+  RefreshControl,
+  Alert,
+} from 'react-native';
+import { useQuery } from '@apollo/client';
+import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MY_VEHICLES, CENTERS, PRICING } from '../apollo/queries';
+import MenuModal from '../components/CustomDrawer';
+import { PaymentMethodModal } from '../components/PaymentMethodModal';
+import { OnlinePaymentModal } from '../components/OnlinePaymentModal';
+
+export default function HomeScreen({ navigation }: any) {
+  const { data, loading, refetch, error } = useQuery(MY_VEHICLES, {
+    fetchPolicy: 'network-only', // Always fetch from network, not cache
+    pollInterval: 5000, // Poll every 5 seconds for real-time updates
+  });
+  const { data: centerData, refetch: refetchCenter } = useQuery(CENTERS, {
+    fetchPolicy: 'network-only', // Always fetch from network, not cache
+    pollInterval: 3000, // Poll every 3 seconds for slot updates
+  });
+  const { data: pricingData } = useQuery(PRICING);
+  
+  const [userName, setUserName] = useState('');
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [onlinePaymentModalVisible, setOnlinePaymentModalVisible] = useState(false);
+  const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
+  const [selectedPaymentId, setSelectedPaymentId] = useState<string>('');
+
+  // Check for vehicles needing payment
+  React.useEffect(() => {
+    if (data?.myVehicles) {
+      const readyVehicle = data.myVehicles.find(
+        (v: any) => v.status === 'READY_FOR_PICKUP' && !v.payment
+      );
+      if (readyVehicle) {
+        setSelectedVehicle(readyVehicle);
+        setPaymentModalVisible(true);
+      }
+    }
+  }, [data]);
+
+  // Debug logging
+  React.useEffect(() => {
+    console.log('HomeScreen - Query state:', { 
+      loading, 
+      hasData: !!data, 
+      vehiclesCount: data?.myVehicles?.length,
+      error: error?.message 
+    });
+    if (data?.myVehicles) {
+      console.log('Vehicles:', JSON.stringify(data.myVehicles, null, 2));
+    }
+    if (centerData?.centers?.[0]) {
+      console.log('Center data:', JSON.stringify(centerData.centers[0], null, 2));
+    } else {
+      console.log('No center data available');
+    }
+  }, [data, loading, error, centerData]);
+
+  // Load user data and refetch vehicles whenever screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      loadUserData();
+      refetch(); // Refetch vehicles when screen comes into focus
+      refetchCenter(); // Refetch center data for slot info
+    }, [refetch, refetchCenter])
+  );
+
+  const loadUserData = async () => {
+    try {
+      const userJson = await AsyncStorage.getItem('user');
+      if (userJson) {
+        const user = JSON.parse(userJson);
+        setUserName(user.name || user.mobile);
+      }
+    } catch (error) {
+      console.error('Failed to load user data:', error);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'REGISTERED':
+        return '#9CA3AF';
+      case 'RECEIVED':
+        return '#3B82F6';
+      case 'WASHING':
+        return '#F59E0B';
+      case 'READY_FOR_PICKUP':
+        return '#10B981';
+      case 'DELIVERED':
+        return '#6B7280';
+      default:
+        return '#6B7280';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'REGISTERED':
+        return 'Registered';
+      case 'RECEIVED':
+        return 'Received';
+      case 'WASHING':
+        return 'Washing';
+      case 'READY_FOR_PICKUP':
+        return 'Ready for Pickup';
+      case 'DELIVERED':
+        return 'Delivered';
+      default:
+        return status;
+    }
+  };
+
+  const renderVehicle = ({ item }: any) => (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.vehicleNumber}>{item.vehicleNumber}</Text>
+        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+          <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
+        </View>
+      </View>
+
+      <View style={styles.cardBody}>
+        <Text style={styles.vehicleInfo}>
+          {item.vehicleType === 'CAR' ? '🚗' : '🏍️'} {item.brand} {item.model}
+        </Text>
+        <Text style={styles.vehicleColor}>Color: {item.color || 'N/A'}</Text>
+        
+        {item.worker && (
+          <Text style={styles.workerInfo}>
+            👷 Worker: {item.worker.name || item.worker.mobile}
+          </Text>
+        )}
+
+        {item.payment && (
+          <View style={styles.paymentInfo}>
+            <Text style={styles.paymentAmount}>₹{item.payment.amount}</Text>
+            <Text style={[
+              styles.paymentStatus,
+              { color: item.payment.status === 'PAID' ? '#10B981' : '#F59E0B' }
+            ]}>
+              {item.payment.status}
+            </Text>
+          </View>
+        )}
+
+        {/* Pay Now Button for READY_FOR_PICKUP without payment or with pending payment */}
+        {item.status === 'READY_FOR_PICKUP' && (!item.payment || item.payment.status === 'MANUAL_PENDING') && (
+          <TouchableOpacity
+            style={styles.payNowButton}
+            onPress={() => {
+              setSelectedVehicle(item);
+              setPaymentModalVisible(true);
+            }}
+          >
+            <Text style={styles.payNowButtonText}>
+              💳 {item.payment ? 'Change Payment Method' : 'Pay Now'}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {item.receivedAt && (
+        <Text style={styles.timestamp}>
+          Received: {new Date(item.receivedAt).toLocaleDateString()}
+        </Text>
+      )}
+      {!item.receivedAt && item.status === 'REGISTERED' && (
+        <Text style={styles.timestamp}>
+          Registered: {new Date(item.createdAt).toLocaleDateString()}
+        </Text>
+      )}
+    </View>
+  );
+
+  return (
+    <View style={styles.container}>
+      {/* Menu Modal */}
+      <MenuModal 
+        visible={menuVisible} 
+        onClose={() => setMenuVisible(false)} 
+        navigation={navigation}
+      />
+      
+      {/* Header with Menu Button */}
+      <View style={styles.headerBar}>
+        <TouchableOpacity 
+          style={styles.menuButton}
+          onPress={() => setMenuVisible(true)}
+        >
+          <Text style={styles.menuIcon}>☰</Text>
+        </TouchableOpacity>
+        <View style={styles.headerTextContainer}>
+          <Text style={styles.title}>My Vehicles</Text>
+        </View>
+        <View style={styles.menuButton} />
+      </View>
+
+      <View style={styles.header}>
+        {userName ? (
+          <Text style={styles.welcomeText}>Welcome, {userName}</Text>
+        ) : null}
+        <Text style={styles.subtitle}>Track your vehicle wash status</Text>
+      </View>
+
+      {/* Slot Availability Banner */}
+      <View style={styles.slotBanner}>
+        {centerData?.centers?.[0] ? (
+          <>
+            {centerData.centers[0].availableSlotsTwoWheeler === 0 && centerData.centers[0].availableSlotsCar === 0 ? (
+              <View style={styles.slotFullBanner}>
+                <Text style={styles.slotFullIcon}>⚠️</Text>
+                <View style={styles.slotTextContainer}>
+                  <Text style={styles.slotFullTitle}>All Slots Full Today</Text>
+                  <Text style={styles.slotFullDescription}>
+                    All slots are currently occupied. Please check back later.
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.slotAvailableBanner}>
+                <Text style={styles.slotAvailableTitle}>✓ Slots Available Today</Text>
+                <View style={styles.slotInfoRow}>
+                  <View style={[
+                    styles.slotTypeInfo,
+                    centerData.centers[0].availableSlotsTwoWheeler === 0 
+                      ? styles.slotFull
+                      : centerData.centers[0].availableSlotsTwoWheeler <= 2
+                      ? styles.slotLow
+                      : styles.slotNormal
+                  ]}>
+                    <Text style={styles.slotTypeIcon}>🏍️</Text>
+                    <Text style={styles.slotTypeLabel}>Two-Wheeler</Text>
+                    <Text style={[
+                      styles.slotTypeText,
+                      centerData.centers[0].availableSlotsTwoWheeler === 0 && styles.slotFullText,
+                      centerData.centers[0].availableSlotsTwoWheeler <= 2 && centerData.centers[0].availableSlotsTwoWheeler > 0 && styles.slotLowText
+                    ]}>
+                      {centerData.centers[0].availableSlotsTwoWheeler}
+                    </Text>
+                    <Text style={styles.slotAvailableTitle}>
+                      {centerData.centers[0].availableSlotsTwoWheeler === 0 
+                        ? 'Slots Closed' 
+                        : centerData.centers[0].availableSlotsTwoWheeler === 1 
+                        ? 'Slot Available' 
+                        : 'Slots Available'}
+                    </Text>
+                    {centerData.centers[0].availableSlotsTwoWheeler === 0 && (
+                      <Text style={styles.slotStatusText}>Full</Text>
+                    )}
+                    {centerData.centers[0].availableSlotsTwoWheeler > 0 && centerData.centers[0].availableSlotsTwoWheeler <= 2 && (
+                      <Text style={styles.slotLowLabel}>Low!</Text>
+                    )}
+                  </View>
+                  <View style={[
+                    styles.slotTypeInfo,
+                    centerData.centers[0].availableSlotsCar === 0 
+                      ? styles.slotFull
+                      : centerData.centers[0].availableSlotsCar <= 2
+                      ? styles.slotLow
+                      : styles.slotNormal
+                  ]}>
+                    <Text style={styles.slotTypeIcon}>🚗</Text>
+                    <Text style={styles.slotTypeLabel}>Car</Text>
+                    <Text style={[
+                      styles.slotTypeText,
+                      centerData.centers[0].availableSlotsCar === 0 && styles.slotFullText,
+                      centerData.centers[0].availableSlotsCar <= 2 && centerData.centers[0].availableSlotsCar > 0 && styles.slotLowText
+                    ]}>
+                      {centerData.centers[0].availableSlotsCar}
+                    </Text>
+                    <Text style={styles.slotAvailableTitle}>
+                      {centerData.centers[0].availableSlotsCar === 0 
+                        ? 'Slots Closed' 
+                        : centerData.centers[0].availableSlotsCar === 1 
+                        ? 'Slot Available' 
+                        : 'Slots Available'}
+                    </Text>
+                    {centerData.centers[0].availableSlotsCar === 0 && (
+                      <Text style={styles.slotStatusText}>Full</Text>
+                    )}
+                    {centerData.centers[0].availableSlotsCar > 0 && centerData.centers[0].availableSlotsCar <= 2 && (
+                      <Text style={styles.slotLowLabel}>Low!</Text>
+                    )}
+                  </View>
+                </View>
+              </View>
+            )}
+          </>
+        ) : (
+          <View style={styles.slotAvailableBanner}>
+            <Text style={styles.slotAvailableTitle}>Loading slot information...</Text>
+          </View>
+        )}
+      </View>
+
+      <FlatList
+        data={data?.myVehicles || []}
+        renderItem={renderVehicle}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.list}
+        refreshControl={
+          <RefreshControl refreshing={loading} onRefresh={refetch} />
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            {error ? (
+              <>
+                <Text style={styles.emptyText}>Error loading vehicles</Text>
+                <Text style={styles.emptySubtext}>{error.message}</Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.emptyText}>No vehicles found</Text>
+                <Text style={styles.emptySubtext}>
+                  Drop your vehicle at our wash center to get started
+                </Text>
+              </>
+            )}
+            <TouchableOpacity 
+              style={styles.addButton}
+              onPress={() => navigation.navigate('AddVehicle')}
+            >
+              <Text style={styles.addButtonText}>Add Your First Vehicle</Text>
+            </TouchableOpacity>
+          </View>
+        }
+      />
+
+      {/* Payment Method Modal */}
+      {selectedVehicle && (
+        <PaymentMethodModal
+          visible={paymentModalVisible}
+          onClose={() => setPaymentModalVisible(false)}
+          vehicleId={selectedVehicle.id}
+          amount={
+            pricingData?.pricing?.find(
+              (p: any) =>
+                p.vehicleType === selectedVehicle.vehicleType &&
+                p.carCategory === selectedVehicle.carCategory
+            )?.price || 0
+          }
+          onPaymentInitiated={(paymentId, method) => {
+            setSelectedPaymentId(paymentId);
+            if (method === 'ONLINE') {
+              setOnlinePaymentModalVisible(true);
+            } else {
+              Alert.alert(
+                'Payment Initiated',
+                method === 'CASH'
+                  ? 'Please pay cash at the counter when you pick up your vehicle.'
+                  : 'Please complete the GPay payment and show proof to staff.',
+                [
+                  {
+                    text: 'OK',
+                    onPress: () => {
+                      refetch();
+                      setPaymentModalVisible(false);
+                    },
+                  },
+                ]
+              );
+            }
+          }}
+        />
+      )}
+
+      {/* Online Payment Modal */}
+      {selectedVehicle && (
+        <OnlinePaymentModal
+          visible={onlinePaymentModalVisible}
+          onClose={() => setOnlinePaymentModalVisible(false)}
+          paymentId={selectedPaymentId}
+          amount={
+            pricingData?.pricing?.find(
+              (p: any) =>
+                p.vehicleType === selectedVehicle.vehicleType &&
+                p.carCategory === selectedVehicle.carCategory
+            )?.price || 0
+          }
+          vehicleNumber={selectedVehicle.vehicleNumber}
+          onPaymentSuccess={() => {
+            refetch();
+            setOnlinePaymentModalVisible(false);
+            setPaymentModalVisible(false);
+          }}
+        />
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F9FAFB',
+  },
+  headerBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 50,
+    paddingBottom: 12,
+    backgroundColor: '#3B82F6',
+  },
+  menuButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuIcon: {
+    fontSize: 28,
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  headerTextContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  header: {
+    padding: 20,
+    paddingTop: 16,
+    backgroundColor: '#fff',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  welcomeText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  slotBanner: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  slotFullBanner: {
+    backgroundColor: '#FEF2F2',
+    borderLeftWidth: 4,
+    borderLeftColor: '#EF4444',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  slotFullIcon: {
+    fontSize: 28,
+    marginRight: 12,
+  },
+  slotTextContainer: {
+    flex: 1,
+  },
+  slotFullTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#991B1B',
+    marginBottom: 4,
+  },
+  slotFullDescription: {
+    fontSize: 14,
+    color: '#991B1B',
+    lineHeight: 20,
+  },
+  slotAvailableBanner: {
+    backgroundColor: '#F0FDF4',
+    borderLeftWidth: 4,
+    borderLeftColor: '#10B981',
+    borderRadius: 12,
+    padding: 16,
+  },
+  slotAvailableIcon: {
+    fontSize: 28,
+    marginRight: 12,
+    color: '#10B981',
+    fontWeight: 'bold',
+  },
+  slotAvailableTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#065F46',
+    marginBottom: 12,
+  },
+  slotAvailableText: {
+    fontSize: 14,
+    color: '#065F46',
+    lineHeight: 20,
+  },
+  slotInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 16,
+    marginTop: 8,
+  },
+  slotTypeInfo: {
+    flex: 1,
+    flexDirection: 'column',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+  },
+  slotNormal: {
+    backgroundColor: '#DCFCE7',
+    borderColor: '#10B981',
+  },
+  slotLow: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#F59E0B',
+  },
+  slotFull: {
+    backgroundColor: '#FEE2E2',
+    borderColor: '#EF4444',
+  },
+  slotTypeIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  slotTypeLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  slotTypeText: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#065F46',
+    textAlign: 'center',
+  },
+  slotLowText: {
+    color: '#D97706',
+  },
+  slotFullText: {
+    color: '#DC2626',
+  },
+  slotStatusText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#DC2626',
+    marginTop: 4,
+    textTransform: 'uppercase',
+  },
+  slotLowLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#D97706',
+    marginTop: 4,
+    textTransform: 'uppercase',
+  },
+  list: {
+    padding: 16,
+  },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  vehicleNumber: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1F2937',
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  statusText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  cardBody: {
+    marginBottom: 12,
+  },
+  vehicleInfo: {
+    fontSize: 16,
+    color: '#374151',
+    marginBottom: 4,
+  },
+  vehicleColor: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  workerInfo: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  paymentInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  paymentAmount: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1F2937',
+  },
+  paymentStatus: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  payNowButton: {
+    backgroundColor: '#8B5CF6',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  payNowButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  timestamp: {
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  addButton: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  addButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+});

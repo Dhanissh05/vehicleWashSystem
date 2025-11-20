@@ -1,0 +1,85 @@
+# Docker Compose for local development and testing
+version: '3.8'
+
+services:
+  # PostgreSQL Database (for production)
+  postgres:
+    image: postgres:16-alpine
+    container_name: vehicle-wash-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-vehiclewash}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+      POSTGRES_DB: ${DB_NAME:-vehiclewash}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-vehiclewash}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for OTP and session storage
+  redis:
+    image: redis:7-alpine
+    container_name: vehicle-wash-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vehicle-wash-backend
+    restart: unless-stopped
+    ports:
+      - "${PORT:-4000}:4000"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${DB_USER:-vehiclewash}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-vehiclewash}?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-change-this-secret-in-production}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change-this-refresh-secret}
+      PORT: 4000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend/uploads:/app/uploads
+    command: sh -c "npx prisma migrate deploy && node dist/index.js"
+
+  # Admin Panel (Nginx serving static files)
+  admin-panel:
+    build:
+      context: ./admin-panel
+      dockerfile: Dockerfile
+    container_name: vehicle-wash-admin
+    restart: unless-stopped
+    ports:
+      - "${ADMIN_PORT:-3000}:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  default:
+    name: vehicle-wash-network

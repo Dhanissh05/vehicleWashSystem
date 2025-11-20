@@ -1,0 +1,199 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  mobile        String    @unique
+  name          String?
+  email         String?   @unique
+  role          String    @default("CUSTOMER") // UserRole: ADMIN, WORKER, CUSTOMER
+  password      String?
+  isActive      Boolean   @default(true)
+  fcmToken      String?   // For push notifications
+  latitude      Float?
+  longitude     Float?
+  workerCode    String?   @unique // Unique code for workers
+  photoUrl      String?   // Profile photo URL for workers
+  biometricEnabled Boolean @default(false) // Biometric login preference
+  biometricPublicKey String? // Secure key for biometric authentication
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  vehicles      Vehicle[] @relation("CustomerVehicles")
+  assignedVehicles Vehicle[] @relation("WorkerVehicles")
+  payments      Payment[]
+  otpCodes      OtpCode[]
+
+  @@index([mobile])
+  @@index([role])
+  @@index([workerCode])
+}
+
+model OtpCode {
+  id          String   @id @default(uuid())
+  mobile      String
+  code        String
+  expiresAt   DateTime
+  verified    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  
+  user        User?    @relation(fields: [userId], references: [id])
+  userId      String?
+
+  @@index([mobile, code])
+}
+
+model ProfileOtp {
+  id          String   @id @default(uuid())
+  type        String   // EMAIL or MOBILE
+  value       String   // email address or mobile number
+  code        String
+  expiresAt   DateTime
+  verified    Boolean  @default(false)
+  userId      String
+  createdAt   DateTime @default(now())
+
+  @@index([value, code])
+  @@index([userId])
+}
+
+model Center {
+  id                      String    @id @default(uuid())
+  name                    String
+  address                 String
+  latitude                Float
+  longitude               Float
+  mobile                  String
+  email                   String?
+  logoUrl                 String?   // Company logo URL
+  dailySlotsTwoWheeler    Int       @default(10)  // Total two-wheeler slots per day
+  availableSlotsTwoWheeler Int      @default(10)  // Currently available two-wheeler slots
+  dailySlotsCar           Int       @default(10)  // Total car slots per day
+  availableSlotsCar       Int       @default(10)  // Currently available car slots
+  isActive                Boolean   @default(true)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  
+  // Relations
+  vehicles    Vehicle[]
+}
+
+model Vehicle {
+  id              String          @id @default(uuid())
+  vehicleNumber   String
+  vehicleType     String          // VehicleType: CAR, TWO_WHEELER
+  carCategory     String?         // CarCategory: SEDAN, SUV, HATCHBACK, HYBRID (Only for cars)
+  model           String?
+  brand           String?
+  color           String?
+  serviceType     String          @default("WASH") // ServiceType: WASH, BODY_REPAIR
+  status          String          @default("REGISTERED") // VehicleStatus: REGISTERED, RECEIVED, WASHING, READY_FOR_PICKUP, DELIVERED (for WASH) or BODY_REPAIR_ASSESSMENT, BODY_REPAIR_IN_PROGRESS, BODY_REPAIR_PAINTING, BODY_REPAIR_COMPLETE, READY_FOR_PICKUP, DELIVERED (for BODY_REPAIR)
+  receivedAt      DateTime?
+  washingAt       DateTime?
+  readyAt         DateTime?
+  deliveredAt     DateTime?
+  bodyRepairAssessmentAt DateTime?
+  bodyRepairInProgressAt DateTime?
+  bodyRepairPaintingAt   DateTime?
+  bodyRepairCompleteAt   DateTime?
+  notes           String?
+  
+  // Relations
+  customer        User            @relation("CustomerVehicles", fields: [customerId], references: [id])
+  customerId      String
+  
+  worker          User?           @relation("WorkerVehicles", fields: [workerId], references: [id])
+  workerId        String?
+  
+  center          Center          @relation(fields: [centerId], references: [id])
+  centerId        String
+  
+  payment         Payment?
+  
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([customerId])
+  @@index([workerId])
+  @@index([status])
+  @@index([vehicleType])
+  @@index([receivedAt])
+  @@index([vehicleNumber])
+}
+
+model Payment {
+  id              String          @id @default(uuid())
+  amount          Float
+  method          String          // PaymentMethod: ONLINE, CASH, GPAY, UPI
+  paymentMode     String?         // GATEWAY (online) or MANUAL (cash/gpay verified by staff)
+  status          String          @default("PENDING") // PaymentStatus: PENDING, PAID, MANUAL_PENDING, REJECTED, REFUNDED
+  transactionId   String?         @unique
+  razorpayOrderId String?
+  razorpayPaymentId String?
+  razorpaySignature String?
+  instamojoPaymentId String?
+  upiId           String?         // For manual UPI/GPay
+  screenshotUrl   String?         // For manual payment verification
+  verifiedBy      String?         // Worker/Admin ID who verified manual payment
+  verifiedAt      DateTime?
+  notes           String?
+  
+  // Relations
+  vehicle         Vehicle         @relation(fields: [vehicleId], references: [id])
+  vehicleId       String          @unique
+  
+  customer        User            @relation(fields: [customerId], references: [id])
+  customerId      String
+  
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([customerId])
+  @@index([status])
+  @@index([method])
+  @@index([createdAt])
+}
+
+model Pricing {
+  id              String          @id @default(uuid())
+  vehicleType     String          // VehicleType: CAR, TWO_WHEELER
+  carCategory     String?         // CarCategory: SEDAN, SUV, HATCHBACK, HYBRID (Only for cars)
+  price           Float
+  description     String?
+  isActive        Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@unique([vehicleType, carCategory])
+  @@index([vehicleType])
+  @@index([isActive])
+}
+
+model SystemConfig {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// SMS Templates for customer notifications
+model SmsTemplate {
+  id          String   @id @default(uuid())
+  key         String   @unique // VEHICLE_RECEIVED, VEHICLE_READY, WORKER_CREDENTIALS
+  template    String   // Template with placeholders: {CUSTOMER_NAME}, {VEHICLE_NUMBER}, etc.
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
