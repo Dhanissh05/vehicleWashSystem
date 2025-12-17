@@ -86,8 +86,9 @@ const startServer = async () => {
   );
 
   const PORT = process.env.PORT || 4000;
+  const HOST = '0.0.0.0'; // Bind to all interfaces for Railway
 
-  app.listen(PORT, () => {
+  app.listen(PORT, HOST, () => {
     console.log(`🚀 Server ready at http://localhost:${PORT}/graphql`);
     console.log(`📝 REST API ready at http://localhost:${PORT}/api`);
   });
