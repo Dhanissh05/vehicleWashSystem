@@ -10,18 +10,18 @@ WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# Install dependencies
-RUN npm ci --only=production && \
+# Install ALL dependencies (including devDependencies for build)
+RUN npm ci && \
     npm cache clean --force
 
 # Copy source code
 COPY . .
 
-# Generate Prisma Client
-RUN npx prisma generate
-
-# Build TypeScript
+# Generate Prisma Client and Build TypeScript
 RUN npm run build
+
+# Remove devDependencies after build to reduce size
+RUN npm prune --production
 
 # Stage 2: Production
 FROM node:20-alpine
