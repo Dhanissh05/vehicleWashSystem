@@ -26,8 +26,8 @@ RUN npm prune --production
 # Stage 2: Production
 FROM node:20-alpine
 
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+# Install dumb-init and OpenSSL 1.1 compatibility for Prisma
+RUN apk add --no-cache dumb-init openssl1.1-compat
 
 # Create app user
 RUN addgroup -g 1001 -S nodejs && \
