@@ -96,22 +96,24 @@ async function main() {
   // Create SMS Templates
   const smsTemplates = [
     {
-      id: 'otp-template',
-      templateId: 'OTP_TEMPLATE',
-      content: 'Your Vehicle Wash OTP is: {{otp}}. Valid for 10 minutes.',
+      key: 'OTP_TEMPLATE',
+      template: 'Your Vehicle Wash OTP is: {OTP}. Valid for 10 minutes.',
     },
     {
-      id: 'booking-confirm',
-      templateId: 'BOOKING_CONFIRM',
-      content: 'Your vehicle {{vehicleNumber}} has been booked for washing. Slot: {{slot}}',
+      key: 'VEHICLE_RECEIVED',
+      template: 'Your vehicle {VEHICLE_NUMBER} has been received at our wash center.',
+    },
+    {
+      key: 'VEHICLE_READY',
+      template: 'Your vehicle {VEHICLE_NUMBER} is ready for pickup. Thank you!',
     },
   ];
 
-  for (const template of smsTemplates) {
+  for (const tmpl of smsTemplates) {
     await prisma.smsTemplate.upsert({
-      where: { id: template.id },
-      update: { content: template.content },
-      create: template,
+      where: { key: tmpl.key },
+      update: { template: tmpl.template },
+      create: tmpl,
     });
   }
   console.log('✅ SMS templates created');
