@@ -41,6 +41,9 @@ COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nodejs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nodejs:nodejs /app/package*.json ./
 
+# Generate Prisma Client in production stage
+RUN npx prisma generate
+
 # Create uploads directory
 RUN mkdir -p uploads/logo uploads/payment && \
     chown -R nodejs:nodejs uploads
