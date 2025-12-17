@@ -404,7 +404,14 @@ export const resolvers = {
       }
 
       // Generate JWT token
-    const signOptions: SignOptions = { expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as any };
+      const signOptions: SignOptions = { expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as any };
+      const token = jwt.sign(
+        { id: user.id, mobile: user.mobile, role: user.role },
+        process.env.JWT_SECRET!,
+        signOptions
+      );
+
+      return { token, user };
     },
 
     // Login with password (for admin/worker)
