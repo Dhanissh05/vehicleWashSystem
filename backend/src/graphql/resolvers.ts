@@ -534,6 +534,41 @@ export const resolvers = {
       });
     },
 
+    // Change password (authenticated users)
+    changePassword: async (_: any, { input }: any, context: Context) => {
+      const user = requireAuth(context);
+
+      const fullUser = await context.prisma.user.findUnique({
+        where: { id: user.id },
+      });
+
+      if (!fullUser || !fullUser.password) {
+        throw new Error('Password not set for this account');
+      }
+
+      // Verify current password
+      const isValid = await bcrypt.compare(input.currentPassword, fullUser.password);
+      if (!isValid) {
+        throw new Error('Current password is incorrect');
+      }
+
+      // Validate new password
+      if (input.newPassword.length < 6) {
+        throw new Error('New password must be at least 6 characters long');
+      }
+
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(input.newPassword, 10);
+
+      // Update password
+      const updatedUser = await context.prisma.user.update({
+        where: { id: user.id },
+        data: { password: hashedPassword },
+      });
+
+      return updatedUser;
+    },
+
     // Send OTP for profile update (email or mobile)
     sendProfileOtp: async (_: any, { type, value }: any, context: Context) => {
       const user = requireAuth(context);
@@ -609,6 +644,11 @@ export const resolvers = {
       // Always allow name update without OTP
       if (input.name !== undefined) {
         updateData.name = input.name;
+      }
+
+      // Allow photo URL update
+      if (input.photoUrl !== undefined) {
+        updateData.photoUrl = input.photoUrl;
       }
 
       // For email update, verify OTP

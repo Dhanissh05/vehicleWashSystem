@@ -30,6 +30,7 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/api', otpRouter);
 app.use('/api', smsRouter);
 app.use('/api/upload', uploadRouter);
+app.use('/upload', uploadRouter); // Direct upload route
 app.use('/webhook', webhookRouter);
 
 // Health check

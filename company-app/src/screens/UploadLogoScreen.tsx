@@ -111,7 +111,7 @@ export default function UploadLogoScreen() {
       } as any);
 
       // Upload to backend
-      const response = await fetch('http://192.168.0.3:4000/api/upload/logo', {
+      const response = await fetch('http://192.168.0.9:4000/api/upload/logo', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -183,7 +183,7 @@ export default function UploadLogoScreen() {
                 <Text style={styles.sectionTitle}>Current Logo</Text>
                 <View style={styles.logoPreview}>
                   <Image
-                    source={{ uri: `http://192.168.0.3:4000${currentLogoUrl}` }}
+                    source={{ uri: `http://192.168.0.9:4000${currentLogoUrl}` }}
                     style={styles.logoImage}
                     resizeMode="contain"
                   />

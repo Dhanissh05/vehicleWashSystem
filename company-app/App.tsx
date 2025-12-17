@@ -16,12 +16,13 @@ import WorkersScreen from './src/screens/WorkersScreen';
 import PricingScreen from './src/screens/PricingScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import SlotsScreen from './src/screens/SlotsScreen';
+import WorkerProfileScreen from './src/screens/WorkerProfileScreen';
 
 const Stack = createStackNavigator();
 
 // Apollo Client Setup
 const httpLink = createHttpLink({
-  uri: 'http://192.168.0.3:4000/graphql',
+  uri: 'http://192.168.0.9:4000/graphql',
 });
 
 const authLink = setContext(async (_, { headers }) => {
@@ -53,6 +54,7 @@ export default function App() {
           <Stack.Screen name="Pricing" component={PricingScreen} />
           <Stack.Screen name="Slots" component={SlotsScreen} options={{ title: 'Slot Management' }} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
+          <Stack.Screen name="WorkerProfile" component={WorkerProfileScreen} options={{ title: 'My Profile' }} />
         </Stack.Navigator>
       </NavigationContainer>
     </ApolloProvider>
