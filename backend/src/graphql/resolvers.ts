@@ -407,7 +407,7 @@ export const resolvers = {
       const token = jwt.sign(
         { id: user.id, mobile: user.mobile, role: user.role },
         process.env.JWT_SECRET!,
-        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+        { expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as string }
       );
 
       return { token, user };
@@ -435,7 +435,7 @@ export const resolvers = {
       const token = jwt.sign(
         { id: user.id, mobile: user.mobile, role: user.role },
         process.env.JWT_SECRET!,
-        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+        { expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as string }
       );
 
       return { token, user };
@@ -492,7 +492,7 @@ export const resolvers = {
       const token = jwt.sign(
         { id: user.id, mobile: user.mobile, role: user.role },
         process.env.JWT_SECRET!,
-        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+        { expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as string }
       );
 
       return { token, user };
