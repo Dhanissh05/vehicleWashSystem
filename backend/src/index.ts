@@ -85,7 +85,7 @@ const startServer = async () => {
     })
   );
 
-  const PORT = process.env.PORT || 4000;
+  const PORT = parseInt(process.env.PORT || '4000', 10);
   const HOST = '0.0.0.0'; // Bind to all interfaces for Railway
 
   app.listen(PORT, HOST, () => {
