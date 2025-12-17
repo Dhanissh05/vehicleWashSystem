@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import {
@@ -404,13 +404,7 @@ export const resolvers = {
       }
 
       // Generate JWT token
-      const token = jwt.sign(
-        { id: user.id, mobile: user.mobile, role: user.role },
-        process.env.JWT_SECRET!,
-        { expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as string }
-      );
-
-      return { token, user };
+    const signOptions: SignOptions = { expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as any };
     },
 
     // Login with password (for admin/worker)
@@ -432,10 +426,11 @@ export const resolvers = {
         throw new Error('Account is deactivated');
       }
 
+      const signOptions: SignOptions = { expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as any };
       const token = jwt.sign(
         { id: user.id, mobile: user.mobile, role: user.role },
         process.env.JWT_SECRET!,
-        { expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as string }
+        signOptions
       );
 
       return { token, user };
@@ -489,10 +484,11 @@ export const resolvers = {
       });
 
       // Generate JWT token
+      const signOptions: SignOptions = { expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as any };
       const token = jwt.sign(
         { id: user.id, mobile: user.mobile, role: user.role },
         process.env.JWT_SECRET!,
-        { expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as string }
+        signOptions
       );
 
       return { token, user };
