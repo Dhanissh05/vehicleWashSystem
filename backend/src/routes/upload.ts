@@ -93,6 +93,38 @@ router.post(
 );
 
 /**
+ * Upload profile photo (Any authenticated user)
+ * POST /upload
+ * Body: multipart/form-data with 'file' field
+ * Returns: { url: string }
+ */
+router.post(
+  '/',
+  authenticate,
+  upload.single('file'),
+  async (req: AuthRequest, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+      }
+
+      const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 4000}`;
+      const fileUrl = `${baseUrl}/uploads/general/${req.file.filename}`;
+
+      res.json({
+        success: true,
+        url: fileUrl,
+        filename: req.file.filename,
+        size: req.file.size,
+      });
+    } catch (error: any) {
+      console.error('Profile photo upload error:', error);
+      res.status(500).json({ error: error.message || 'Failed to upload photo' });
+    }
+  }
+);
+
+/**
  * Upload payment screenshot
  * POST /api/upload/payment
  * Body: multipart/form-data with 'file' field

@@ -17,6 +17,12 @@ const GET_CENTER = gql`
       id
       logoUrl
     }
+    me {
+      id
+      name
+      photoUrl
+      role
+    }
   }
 `;
 
@@ -30,13 +36,14 @@ export default function MenuModal({ visible, onClose, navigation }: MenuModalPro
   const [userName, setUserName] = useState('User');
   const [userRole, setUserRole] = useState('');
   const slideAnim = useRef(new Animated.Value(0)).current;
-  const { data } = useQuery(GET_CENTER);
+  const { data, refetch } = useQuery(GET_CENTER);
   
   const center = data?.centers?.[0];
 
   useEffect(() => {
     if (visible) {
       loadUserData();
+      refetch(); // Refetch to get latest user data including photo
     }
   }, [visible]);
 
@@ -108,21 +115,21 @@ export default function MenuModal({ visible, onClose, navigation }: MenuModalPro
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.logoPlaceholder}>
-              {center?.logoUrl ? (
+              {data?.me?.photoUrl ? (
                 <Image
-                  source={{ uri: center.logoUrl }}
+                  source={{ uri: data.me.photoUrl }}
                   style={styles.logoImage}
-                  resizeMode="contain"
+                  resizeMode="cover"
                 />
               ) : (
                 <Text style={styles.logoText}>
-                  {userRole === 'ADMIN' ? '👨‍💼' : '👷'}
+                  {(data?.me?.name || userName)?.charAt(0)?.toUpperCase() || (userRole === 'ADMIN' ? '👨‍💼' : '👷')}
                 </Text>
               )}
             </View>
             <Text style={styles.welcomeText}>Welcome</Text>
-            <Text style={styles.userName}>{userName}</Text>
-            <Text style={styles.userRole}>{userRole}</Text>
+            <Text style={styles.userName}>{data?.me?.name || userName}</Text>
+            <Text style={styles.userRole}>{data?.me?.role || userRole}</Text>
           </View>
 
           {/* Menu Items */}
@@ -158,6 +165,16 @@ export default function MenuModal({ visible, onClose, navigation }: MenuModalPro
               <Text style={styles.menuIcon}>🎫</Text>
               <Text style={styles.menuText}>Slots</Text>
             </TouchableOpacity>
+
+            {userRole === 'WORKER' && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => handleNavigate('WorkerProfile')}
+              >
+                <Text style={styles.menuIcon}>👤</Text>
+                <Text style={styles.menuText}>My Profile</Text>
+              </TouchableOpacity>
+            )}
 
             {userRole === 'ADMIN' && (
               <>

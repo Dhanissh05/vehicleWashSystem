@@ -277,6 +277,12 @@ export const typeDefs = gql`
     mobile: String
     emailOtp: String
     mobileOtp: String
+    photoUrl: String
+  }
+
+  input ChangePasswordInput {
+    currentPassword: String!
+    newPassword: String!
   }
 
   type OtpSendResponse {
@@ -330,6 +336,7 @@ export const typeDefs = gql`
     signup(input: SignupInput!): AuthPayload!
     login(mobile: String!, password: String!): AuthPayload!
     updatePassword(mobile: String!, password: String!): User!
+    changePassword(input: ChangePasswordInput!): User!
     updateLocation(location: LocationInput!): User!
     updateFcmToken(token: String!): User!
     setupBiometric(input: BiometricSetupInput!): User!

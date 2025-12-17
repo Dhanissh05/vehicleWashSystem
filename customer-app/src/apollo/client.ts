@@ -3,7 +3,7 @@ import { setContext } from '@apollo/client/link/context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const httpLink = createHttpLink({
-  uri: 'http://192.168.0.3:4000/graphql', // Backend URL with local IP (same as Expo server)
+  uri: 'http://192.168.0.9:4000/graphql', // Backend URL with local IP (same as Expo server)
 });
 
 const authLink = setContext(async (_, { headers }) => {
