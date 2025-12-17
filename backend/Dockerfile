@@ -2,7 +2,7 @@
 # Optimized for production deployment
 
 # Stage 1: Build
-FROM node:20-slim AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -24,10 +24,10 @@ RUN npm run build
 RUN npm prune --production
 
 # Stage 2: Production
-FROM node:20-slim
+FROM node:20-alpine
 
-# Install dumb-init and OpenSSL for Prisma
-RUN apt-get update && apt-get install -y --no-install-recommends dumb-init openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+# Install dumb-init and required libraries for Prisma
+RUN apk add --no-cache dumb-init openssl libc6-compat libssl3
 
 # Create app user
 RUN addgroup -g 1001 -S nodejs && \
