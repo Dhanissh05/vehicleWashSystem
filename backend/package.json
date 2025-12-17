@@ -23,6 +23,9 @@
     "pm2:logs": "pm2 logs"
   },
   "keywords": ["vehicle", "wash", "management", "graphql"],
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
+  },
   "author": "",
   "license": "ISC",
   "dependencies": {
