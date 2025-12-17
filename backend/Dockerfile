@@ -51,10 +51,6 @@ USER nodejs
 # Expose port (Railway will set PORT env var dynamically)
 EXPOSE 4000
 
-# Health check - use PORT env variable
-HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:' + (process.env.PORT || 4000) + '/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1); })"
-
 # Start application with dumb-init
 ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "dist/index.js"]
