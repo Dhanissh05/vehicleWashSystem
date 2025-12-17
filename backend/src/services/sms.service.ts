@@ -16,31 +16,12 @@ interface SmsParams {
 }
 
 /**
- * Send SMS using configured SMS provider
- * This is a stub implementation - integrate with your SMS provider
+ * Send SMS using Fast2SMS
  */
 export async function sendSms(mobile: string, message: string): Promise<boolean> {
   try {
-    // TODO: Integrate with SMS API provider (e.g., Twilio, MSG91, Fast2SMS)
+    const axios = require('axios');
     
-    // Example integration with Fast2SMS:
-    // const axios = require('axios');
-    // const response = await axios.post('https://www.fast2sms.com/dev/bulkV2', {
-    //   authorization: process.env.SMS_API_KEY,
-    //   route: 'q',
-    //   message: message,
-    //   numbers: mobile,
-    // });
-    
-    // Example integration with Twilio:
-    // const twilio = require('twilio');
-    // const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-    // await client.messages.create({
-    //   body: message,
-    //   from: process.env.TWILIO_PHONE_NUMBER,
-    //   to: `+91${mobile}`,
-    // });
-
     // Log SMS for development
     console.log('\n📱 SMS SERVICE');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -48,9 +29,34 @@ export async function sendSms(mobile: string, message: string): Promise<boolean>
     console.log(`Message: ${message}`);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
+    // If no SMS API key configured, just log (for development)
+    if (!process.env.FAST2SMS_API_KEY) {
+      console.log('⚠️  FAST2SMS_API_KEY not configured - SMS not sent');
+      return true;
+    }
+
+    // Send via Fast2SMS
+    const response = await axios.post(
+      'https://www.fast2sms.com/dev/bulkV2',
+      {
+        route: 'q',
+        message: message,
+        language: 'english',
+        flash: 0,
+        numbers: mobile,
+      },
+      {
+        headers: {
+          authorization: process.env.FAST2SMS_API_KEY,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    console.log('✅ SMS sent successfully:', response.data);
     return true;
   } catch (error) {
-    console.error('SMS sending failed:', error);
+    console.error('❌ SMS sending failed:', error);
     return false;
   }
 }
@@ -91,11 +97,47 @@ export async function sendTemplateSms(
 }
 
 /**
- * Send OTP SMS
+ * Send OTP SMS using Fast2SMS OTP route
  */
 export async function sendOtpSms(mobile: string, otp: string): Promise<boolean> {
-  const message = `Your Vehicle Wash OTP is: ${otp}. Valid for 10 minutes. Do not share this code.`;
-  return await sendSms(mobile, message);
+  try {
+    const axios = require('axios');
+    
+    // Log OTP for development
+    console.log('\n📱 OTP SMS SERVICE');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log(`To: ${mobile}`);
+    console.log(`OTP: ${otp}`);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+
+    // If no SMS API key configured, just log (for development)
+    if (!process.env.FAST2SMS_API_KEY) {
+      console.log('⚠️  FAST2SMS_API_KEY not configured - OTP logged above');
+      return true;
+    }
+
+    // Send via Fast2SMS OTP route
+    const response = await axios.post(
+      'https://www.fast2sms.com/dev/bulkV2',
+      {
+        route: 'otp',
+        variables_values: otp,
+        numbers: mobile,
+      },
+      {
+        headers: {
+          authorization: process.env.FAST2SMS_API_KEY,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    console.log('✅ OTP sent successfully:', response.data);
+    return true;
+  } catch (error) {
+    console.error('❌ OTP sending failed:', error);
+    return false;
+  }
 }
 
 /**
