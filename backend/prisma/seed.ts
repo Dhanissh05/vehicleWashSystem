@@ -104,6 +104,11 @@ async function main() {
       isActive: true,
     },
     {
+      key: 'PAYMENT_SUCCESS',
+      template: 'Payment Successful! Hi {CUSTOMER_NAME}, we received ₹{AMOUNT} for {VEHICLE_NUMBER} via {PAYMENT_METHOD}. Thank you!',
+      isActive: true,
+    },
+    {
       key: 'WORKER_CREDENTIALS',
       template: 'Welcome to {SHOP_NAME}! Your worker account: Mobile: {MOBILE}, Password: {PASSWORD}, Worker Code: {WORKER_CODE}. Download: {PLAY_STORE_LINK}',
       isActive: true,

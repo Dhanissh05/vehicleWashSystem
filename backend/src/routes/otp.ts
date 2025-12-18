@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { sendOtpSms } from '../services/sms.service';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -25,17 +26,16 @@ router.post('/send-otp', async (req, res) => {
       },
     });
 
-    // TODO: Integrate with SMS API
-    // const axios = require('axios');
-    // await axios.post(process.env.SMS_API_URL, {
-    //   apiKey: process.env.SMS_API_KEY,
-    //   mobile,
-    //   message: `Your OTP is: ${code}. Valid for 10 minutes.`,
-    // });
+    // Send OTP via Fast2SMS
+    const smsSent = await sendOtpSms(mobile, code);
 
-    console.log(`📱 OTP for ${mobile}: ${code}`);
+    console.log(`📱 OTP for ${mobile}: ${code} (SMS sent: ${smsSent})`);
 
-    res.json({ success: true, message: 'OTP sent successfully' });
+    res.json({ 
+      success: true, 
+      message: 'OTP sent successfully',
+      debug: process.env.NODE_ENV === 'development' ? { code } : undefined
+    });
   } catch (error) {
     console.error('Error sending OTP:', error);
     res.status(500).json({ error: 'Failed to send OTP' });

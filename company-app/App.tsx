@@ -21,8 +21,14 @@ import WorkerProfileScreen from './src/screens/WorkerProfileScreen';
 const Stack = createStackNavigator();
 
 // Apollo Client Setup
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
+
+if (!API_URL) {
+  throw new Error('EXPO_PUBLIC_API_URL is not defined in .env file');
+}
+
 const httpLink = createHttpLink({
-  uri: 'http://192.168.0.9:4000/graphql',
+  uri: API_URL,
 });
 
 const authLink = setContext(async (_, { headers }) => {

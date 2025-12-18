@@ -157,8 +157,13 @@ export default function WorkerProfileScreen({ navigation }: any) {
       // Get token
       const token = await AsyncStorage.getItem('token');
 
+      const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
+      if (!API_BASE_URL) {
+        throw new Error('EXPO_PUBLIC_API_BASE_URL is not defined in .env file');
+      }
+
       // Upload to server
-      const response = await fetch('http://192.168.0.9:4000/upload', {
+      const response = await fetch(`${API_BASE_URL}/upload`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

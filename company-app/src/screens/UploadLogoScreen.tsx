@@ -111,7 +111,11 @@ export default function UploadLogoScreen() {
       } as any);
 
       // Upload to backend
-      const response = await fetch('http://192.168.0.9:4000/api/upload/logo', {
+      const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
+      if (!API_BASE_URL) {
+        throw new Error('EXPO_PUBLIC_API_BASE_URL is not defined in .env file');
+      }
+      const response = await fetch(`${API_BASE_URL}/api/upload/logo`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -183,7 +187,7 @@ export default function UploadLogoScreen() {
                 <Text style={styles.sectionTitle}>Current Logo</Text>
                 <View style={styles.logoPreview}>
                   <Image
-                    source={{ uri: `http://192.168.0.9:4000${currentLogoUrl}` }}
+                    source={{ uri: `${process.env.EXPO_PUBLIC_API_BASE_URL}${currentLogoUrl}` }}
                     style={styles.logoImage}
                     resizeMode="contain"
                   />

@@ -7,6 +7,7 @@ import {
   sendVehicleReadySms,
   sendWorkerCredentialsSms,
   sendOtpSms,
+  sendPaymentSuccessSms,
 } from '../services/sms.service';
 import {
   sendVehicleReadyNotification,
@@ -1148,7 +1149,7 @@ export const resolvers = {
     verifyManualPayment: async (_: any, { input }: any, context: Context) => {
       const user = requireAdmin(context);
       
-      return await context.prisma.payment.update({
+      const updatedPayment = await context.prisma.payment.update({
         where: { id: input.paymentId },
         data: {
           status: input.approved ? PaymentStatus.PAID : PaymentStatus.REJECTED,
@@ -1161,6 +1162,19 @@ export const resolvers = {
           customer: true,
         },
       });
+
+      // Send payment success SMS if approved
+      if (input.approved && updatedPayment.customer?.name) {
+        await sendPaymentSuccessSms(
+          updatedPayment.customer.mobile,
+          updatedPayment.customer.name,
+          updatedPayment.vehicle.vehicleNumber,
+          updatedPayment.amount,
+          'Manual Payment (Verified)'
+        );
+      }
+
+      return updatedPayment;
     },
 
     // Create Razorpay order
@@ -1270,7 +1284,7 @@ export const resolvers = {
       //   throw new Error('Payment verification failed');
       // }
 
-      return await context.prisma.payment.update({
+      const updatedPayment = await context.prisma.payment.update({
         where: { id: paymentId },
         data: {
           status: PaymentStatus.PAID,
@@ -1282,6 +1296,19 @@ export const resolvers = {
           customer: true,
         },
       });
+
+      // Send payment success SMS
+      if (updatedPayment.customer?.name) {
+        await sendPaymentSuccessSms(
+          updatedPayment.customer.mobile,
+          updatedPayment.customer.name,
+          updatedPayment.vehicle.vehicleNumber,
+          updatedPayment.amount,
+          'Online Payment'
+        );
+      }
+
+      return updatedPayment;
     },
 
     // Confirm manual payment (Cash/GPay) by staff
@@ -1301,7 +1328,7 @@ export const resolvers = {
         throw new Error('This payment is not a manual payment');
       }
 
-      return await context.prisma.payment.update({
+      const updatedPayment = await context.prisma.payment.update({
         where: { id: input.paymentId },
         data: {
           amount: input.amount,
@@ -1315,6 +1342,20 @@ export const resolvers = {
           customer: true,
         },
       });
+
+      // Send payment success SMS
+      if (updatedPayment.customer?.name) {
+        const paymentMethod = payment.method === 'CASH' ? 'Cash' : 'GPay/UPI';
+        await sendPaymentSuccessSms(
+          updatedPayment.customer.mobile,
+          updatedPayment.customer.name,
+          updatedPayment.vehicle.vehicleNumber,
+          updatedPayment.amount,
+          paymentMethod
+        );
+      }
+
+      return updatedPayment;
     },
 
     // Create worker (Admin only) - Returns credentials for SMS/display

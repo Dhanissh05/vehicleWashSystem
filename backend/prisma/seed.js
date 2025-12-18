@@ -96,16 +96,24 @@ async function main() {
   // Create SMS Templates
   const smsTemplates = [
     {
-      key: 'OTP_TEMPLATE',
-      template: 'Your Vehicle Wash OTP is: {OTP}. Valid for 10 minutes.',
-    },
-    {
       key: 'VEHICLE_RECEIVED',
-      template: 'Your vehicle {VEHICLE_NUMBER} has been received at our wash center.',
+      template: 'Hi {CUSTOMER_NAME}, your vehicle {VEHICLE_NUMBER} was received at {SHOP_NAME} on {TIMESTAMP}. Track progress: {PLAY_STORE_LINK}',
+      isActive: true,
     },
     {
       key: 'VEHICLE_READY',
-      template: 'Your vehicle {VEHICLE_NUMBER} is ready for pickup. Thank you!',
+      template: 'Hi {CUSTOMER_NAME}, your vehicle {VEHICLE_NUMBER} is ready for pickup at {SHOP_NAME}. Payment: ₹{AMOUNT}. {PAYMENT_LINK}',
+      isActive: true,
+    },
+    {
+      key: 'PAYMENT_SUCCESS',
+      template: 'Payment Successful! Hi {CUSTOMER_NAME}, we received ₹{AMOUNT} for {VEHICLE_NUMBER} via {PAYMENT_METHOD}. Thank you!',
+      isActive: true,
+    },
+    {
+      key: 'WORKER_CREDENTIALS',
+      template: 'Welcome to {SHOP_NAME}! Your worker account: Mobile: {MOBILE}, Password: {PASSWORD}, Worker Code: {WORKER_CODE}. Download: {PLAY_STORE_LINK}',
+      isActive: true,
     },
   ];
 

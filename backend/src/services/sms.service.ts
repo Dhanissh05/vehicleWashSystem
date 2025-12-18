@@ -16,7 +16,8 @@ interface SmsParams {
 }
 
 /**
- * Send SMS using Fast2SMS
+ * Send SMS using Fast2SMS Quick SMS API
+ * Endpoint: POST https://www.fast2sms.com/dev/bulkV2
  */
 export async function sendSms(mobile: string, message: string): Promise<boolean> {
   try {
@@ -35,28 +36,29 @@ export async function sendSms(mobile: string, message: string): Promise<boolean>
       return true;
     }
 
-    // Send via Fast2SMS
+    // Send via Fast2SMS Quick SMS API
+    // Documentation: https://docs.fast2sms.com/reference/get_new-endpoint
     const response = await axios.post(
       'https://www.fast2sms.com/dev/bulkV2',
+      null,
       {
-        route: 'q',
-        message: message,
-        language: 'english',
-        flash: 0,
-        numbers: mobile,
-      },
-      {
+        params: {
+          route: 'q', // Quick SMS route
+          message: message,
+          numbers: mobile,
+          flash: '0', // 0 = normal message, 1 = flash message
+        },
         headers: {
-          authorization: process.env.FAST2SMS_API_KEY,
+          'authorization': process.env.FAST2SMS_API_KEY,
           'Content-Type': 'application/json',
         },
       }
     );
 
     console.log('✅ SMS sent successfully:', response.data);
-    return true;
-  } catch (error) {
-    console.error('❌ SMS sending failed:', error);
+    return response.data.return === true || response.status === 200;
+  } catch (error: any) {
+    console.error('❌ SMS sending failed:', error.response?.data || error.message);
     return false;
   }
 }
@@ -97,7 +99,8 @@ export async function sendTemplateSms(
 }
 
 /**
- * Send OTP SMS using Fast2SMS OTP route
+ * Send OTP SMS using Fast2SMS Quick SMS API
+ * Using Quick SMS route with OTP message format
  */
 export async function sendOtpSms(mobile: string, otp: string): Promise<boolean> {
   try {
@@ -116,26 +119,31 @@ export async function sendOtpSms(mobile: string, otp: string): Promise<boolean> 
       return true;
     }
 
-    // Send via Fast2SMS OTP route
+    // Create OTP message
+    const message = `Your OTP for SandTell's Vehicle Wash System is: ${otp}. Valid for 5 minutes. Do not share with anyone.`;
+
+    // Send via Fast2SMS Quick SMS API
     const response = await axios.post(
       'https://www.fast2sms.com/dev/bulkV2',
+      null,
       {
-        route: 'otp',
-        variables_values: otp,
-        numbers: mobile,
-      },
-      {
+        params: {
+          route: 'q', // Quick SMS route
+          message: message,
+          numbers: mobile,
+          flash: '0',
+        },
         headers: {
-          authorization: process.env.FAST2SMS_API_KEY,
+          'authorization': process.env.FAST2SMS_API_KEY,
           'Content-Type': 'application/json',
         },
       }
     );
 
     console.log('✅ OTP sent successfully:', response.data);
-    return true;
-  } catch (error) {
-    console.error('❌ OTP sending failed:', error);
+    return response.data.return === true || response.status === 200;
+  } catch (error: any) {
+    console.error('❌ OTP sending failed:', error.response?.data || error.message);
     return false;
   }
 }
@@ -202,6 +210,24 @@ export async function sendWorkerCredentialsSms(
     WORKER_CODE: workerCode,
     SHOP_NAME: shopName,
     PLAY_STORE_LINK: playStoreLink,
+  });
+}
+
+/**
+ * Send payment success notification
+ */
+export async function sendPaymentSuccessSms(
+  mobile: string,
+  customerName: string,
+  vehicleNumber: string,
+  amount: number,
+  paymentMethod: string
+): Promise<boolean> {
+  return await sendTemplateSms('PAYMENT_SUCCESS', mobile, {
+    CUSTOMER_NAME: customerName,
+    VEHICLE_NUMBER: vehicleNumber,
+    AMOUNT: amount.toString(),
+    PAYMENT_METHOD: paymentMethod,
   });
 }
 
