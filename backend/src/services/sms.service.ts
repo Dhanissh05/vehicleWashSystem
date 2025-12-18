@@ -13,6 +13,7 @@ interface SmsParams {
   MOBILE?: string;
   PASSWORD?: string;
   WORKER_CODE?: string;
+  PAYMENT_METHOD?: string;
 }
 
 /**
