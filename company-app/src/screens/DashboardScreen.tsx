@@ -10,6 +10,7 @@ import { useQuery } from '@apollo/client';
 import { gql } from '@apollo/client';
 import MenuModal from '../components/MenuModal';
 import VehicleListModal from '../components/VehicleListModal';
+import CalendarIcon from '../components/CalendarIcon';
 
 const DASHBOARD_METRICS = gql`
   query DashboardMetrics {
@@ -182,6 +183,16 @@ export default function DashboardScreen({ navigation }: any) {
         >
           <Text style={styles.actionIcon}>🔧</Text>
           <Text style={styles.actionText}>Body Repair & Painting</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => navigation.navigate('SlotBookings')}
+        >
+          <View style={styles.actionIcon}>
+            <CalendarIcon size={32} />
+          </View>
+          <Text style={styles.actionText}>Slot Bookings</Text>
         </TouchableOpacity>
 
         {/* Removed other actions until screens are created */}

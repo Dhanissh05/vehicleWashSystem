@@ -134,6 +134,16 @@ async function main() {
       description: 'Customer app Play Store URL',
     },
   });
+
+  await prisma.systemConfig.upsert({
+    where: { key: 'ENABLE_SLOT_BOOKING' },
+    update: {},
+    create: {
+      key: 'ENABLE_SLOT_BOOKING',
+      value: 'false',
+      description: 'Enable slot booking feature',
+    },
+  });
   console.log('✅ System config created');
 
   console.log('🎉 Seeding completed successfully!');

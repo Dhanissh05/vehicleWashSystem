@@ -10,7 +10,8 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery } from '@apollo/client';
-import { CENTERS } from '../apollo/queries';
+import { CENTERS, SYSTEM_CONFIG } from '../apollo/queries';
+import CalendarIcon from './CalendarIcon';
 
 interface MenuModalProps {
   visible: boolean;
@@ -21,13 +22,20 @@ interface MenuModalProps {
 export default function MenuModal({ visible, onClose, navigation }: MenuModalProps) {
   const [userName, setUserName] = useState('Guest');
   const { data: centersData } = useQuery(CENTERS);
+  const { data: configData, refetch: refetchConfig } = useQuery(SYSTEM_CONFIG, {
+    variables: { key: 'ENABLE_SLOT_BOOKING' },
+    fetchPolicy: 'network-only',
+  });
   const companyLogo = centersData?.centers?.[0]?.logoUrl;
   const slideAnim = useRef(new Animated.Value(0)).current;
+  const slotBookingEnabled = configData?.systemConfig?.value === 'true';
 
   // Load user data whenever modal becomes visible
   useEffect(() => {
     if (visible) {
       loadUserData();
+      // Refetch config to get latest slot booking status
+      refetchConfig();
     }
   }, [visible]);
 
@@ -130,12 +138,42 @@ export default function MenuModal({ visible, onClose, navigation }: MenuModalPro
               <Text style={styles.menuText}>Add Vehicle</Text>
             </TouchableOpacity>
 
+            {slotBookingEnabled && (
+              <>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => handleNavigate('SlotBooking')}
+                >
+                  <View style={styles.menuIcon}>
+                    <CalendarIcon size={24} />
+                  </View>
+                  <Text style={styles.menuText}>Slot Booking</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => handleNavigate('BookedSlots')}
+                >
+                  <Text style={styles.menuIcon}>📋</Text>
+                  <Text style={styles.menuText}>Booked Slots</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
             <TouchableOpacity
               style={styles.menuItem}
               onPress={() => handleNavigate('TrackProgress')}
             >
               <Text style={styles.menuIcon}>📍</Text>
               <Text style={styles.menuText}>Track Progress</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => handleNavigate('Payments')}
+            >
+              <Text style={styles.menuIcon}>💳</Text>
+              <Text style={styles.menuText}>Payments</Text>
             </TouchableOpacity>
 
             <TouchableOpacity

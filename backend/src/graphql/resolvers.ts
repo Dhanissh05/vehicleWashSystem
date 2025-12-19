@@ -46,7 +46,17 @@ const PaymentStatus = {
   REFUNDED: 'REFUNDED',
 };
 
+const SlotBookingStatus = {
+  PENDING: 'PENDING',
+  VERIFIED: 'VERIFIED',
+  CANCELLED: 'CANCELLED',
+};
+
 const prisma = new PrismaClient();
+
+function generateOTP(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
 
 interface Context {
   user?: {
@@ -338,11 +348,86 @@ export const resolvers = {
       });
     },
 
+    // Get my payments (customer)
+    myPayments: async (_: any, __: any, context: Context) => {
+      try {
+        const user = requireAuth(context);
+        console.log('myPayments query - User ID:', user.id);
+        
+        const payments = await context.prisma.payment.findMany({
+          where: { customerId: user.id },
+          include: {
+            vehicle: true,
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+        
+        console.log('myPayments query - Found payments:', payments.length);
+        return payments;
+      } catch (error) {
+        console.error('myPayments error:', error);
+        throw error;
+      }
+    },
+
     // Get centers
     centers: async (_: any, __: any, context: Context) => {
       return await context.prisma.center.findMany({
         where: { isActive: true },
       });
+    },
+
+    slotBookings: async (_: any, { status }: any, context: Context) => {
+      requireStaff(context);
+
+      const where: any = {};
+      if (status) {
+        where.status = status;
+      }
+
+      return await context.prisma.slotBooking.findMany({
+        where,
+        include: { center: true },
+        orderBy: { createdAt: 'desc' },
+      });
+    },
+
+    mySlotBookings: async (_: any, __: any, context: Context) => {
+      requireAuth(context);
+
+      return await context.prisma.slotBooking.findMany({
+        where: { customerMobile: context.user!.mobile },
+        include: { center: true },
+        orderBy: { createdAt: 'desc' },
+      });
+    },
+
+    slotBookingById: async (_: any, { id }: any, context: Context) => {
+      requireAuth(context);
+
+      const booking = await context.prisma.slotBooking.findUnique({
+        where: { id },
+        include: { center: true },
+      });
+
+      if (!booking) {
+        return null;
+      }
+
+      const isCustomer = context.user!.role === UserRole.CUSTOMER;
+      if (isCustomer && booking.customerMobile !== context.user!.mobile) {
+        throw new Error('Unauthorized');
+      }
+
+      return booking;
+    },
+
+    systemConfig: async (_: any, { key }: any, context: Context) => {
+      const config = await context.prisma.systemConfig.findUnique({
+        where: { key },
+      });
+
+      return config || { key, value: 'false' };
     },
   },
 
@@ -800,6 +885,7 @@ export const resolvers = {
               brand: input.brand || existingVehicle.brand,
               model: input.model || existingVehicle.model,
               color: input.color || existingVehicle.color,
+              photoUrl: input.photoUrl || existingVehicle.photoUrl,
               notes: input.notes || existingVehicle.notes,
             },
             include: {
@@ -883,6 +969,7 @@ export const resolvers = {
         model: input.model,
         brand: input.brand,
         color: input.color,
+        photoUrl: input.photoUrl,
         serviceType: input.serviceType || ServiceType.WASH,
         notes: input.notes,
         customerId: customerData.id,
@@ -1542,7 +1629,6 @@ export const resolvers = {
         throw new Error('Daily slots cannot be negative');
       }
 
-      // Get the first center (for single-center setups)
       const center = await context.prisma.center.findFirst();
       
       if (!center) {
@@ -1553,10 +1639,204 @@ export const resolvers = {
         where: { id: center.id },
         data: { 
           dailySlotsTwoWheeler,
-          availableSlotsTwoWheeler: dailySlotsTwoWheeler, // Reset available slots to new daily limit
+          availableSlotsTwoWheeler: dailySlotsTwoWheeler,
           dailySlotsCar,
-          availableSlotsCar: dailySlotsCar, // Reset available slots to new daily limit
+          availableSlotsCar: dailySlotsCar,
         },
+      });
+    },
+
+    createSlotBooking: async (_: any, { input }: any, context: Context) => {
+      requireAuth(context);
+
+      const enableSlotBooking = await context.prisma.systemConfig.findUnique({
+        where: { key: 'ENABLE_SLOT_BOOKING' },
+      });
+
+      if (enableSlotBooking?.value !== 'true') {
+        throw new Error('Slot booking is currently disabled');
+      }
+
+      const center = await context.prisma.center.findUnique({
+        where: { id: input.centerId },
+      });
+
+      if (!center) {
+        throw new Error('Wash center not found');
+      }
+
+      if (!input.carWash && !input.twoWheelerWash && !input.bodyRepair) {
+        throw new Error('Please select at least one service type');
+      }
+
+      const otp = generateOTP();
+
+      const booking = await context.prisma.slotBooking.create({
+        data: {
+          customerMobile: input.customerMobile,
+          customerName: input.customerName,
+          vehicleNumber: input.vehicleNumber,
+          vehicleType: input.vehicleType,
+          carCategory: input.carCategory,
+          brand: input.brand,
+          model: input.model,
+          color: input.color,
+          photoUrl: input.photoUrl,
+          carWash: input.carWash || false,
+          twoWheelerWash: input.twoWheelerWash || false,
+          bodyRepair: input.bodyRepair || false,
+          otp,
+          centerId: input.centerId,
+        },
+        include: { center: true },
+      });
+
+      return booking;
+    },
+
+    verifySlotBooking: async (_: any, { input }: any, context: Context) => {
+      requireStaff(context);
+
+      const booking = await context.prisma.slotBooking.findUnique({
+        where: { id: input.bookingId },
+        include: { center: true },
+      });
+
+      if (!booking) {
+        throw new Error('Booking not found');
+      }
+
+      if (booking.status !== SlotBookingStatus.PENDING) {
+        throw new Error('Booking has already been processed');
+      }
+
+      if (booking.otp !== input.otp) {
+        throw new Error('Invalid OTP');
+      }
+
+      let customer = await context.prisma.user.findUnique({
+        where: { mobile: booking.customerMobile },
+      });
+
+      if (!customer) {
+        customer = await context.prisma.user.create({
+          data: {
+            mobile: booking.customerMobile,
+            name: booking.customerName,
+            role: UserRole.CUSTOMER,
+          },
+        });
+      }
+
+      const isTwoWheeler = booking.vehicleType === 'TWO_WHEELER';
+      const availableSlots = isTwoWheeler 
+        ? booking.center.availableSlotsTwoWheeler 
+        : booking.center.availableSlotsCar;
+      
+      if (availableSlots <= 0) {
+        throw new Error('No slots available');
+      }
+
+      await context.prisma.center.update({
+        where: { id: booking.centerId },
+        data: isTwoWheeler 
+          ? { availableSlotsTwoWheeler: { decrement: 1 } }
+          : { availableSlotsCar: { decrement: 1 } },
+      });
+
+      await context.prisma.slotBooking.update({
+        where: { id: booking.id },
+        data: {
+          status: SlotBookingStatus.VERIFIED,
+          verifiedAt: new Date(),
+          verifiedBy: context.user!.id,
+        },
+      });
+
+      const serviceType = booking.bodyRepair ? ServiceType.BODY_REPAIR : ServiceType.WASH;
+
+      const vehicle = await context.prisma.vehicle.create({
+        data: {
+          vehicleNumber: booking.vehicleNumber,
+          vehicleType: booking.vehicleType,
+          carCategory: booking.carCategory,
+          model: booking.model,
+          brand: booking.brand,
+          color: booking.color,
+          photoUrl: booking.photoUrl,
+          serviceType,
+          status: VehicleStatus.RECEIVED,
+          receivedAt: new Date(),
+          customerId: customer.id,
+          centerId: booking.centerId,
+        },
+        include: {
+          customer: true,
+          center: true,
+        },
+      });
+
+      setTimeout(async () => {
+        try {
+          const nextStatus = serviceType === ServiceType.WASH 
+            ? VehicleStatus.WASHING 
+            : VehicleStatus.BODY_REPAIR_ASSESSMENT;
+          
+          await context.prisma.vehicle.update({
+            where: { id: vehicle.id },
+            data: { status: nextStatus },
+          });
+        } catch (error) {
+          console.error('Failed to auto-transition vehicle:', error);
+        }
+      }, 2000);
+
+      if (vehicle.customer?.name && booking.center?.name) {
+        await sendVehicleReceivedSms(
+          vehicle.customer.mobile,
+          vehicle.customer.name,
+          vehicle.vehicleNumber,
+          booking.center.name
+        );
+      }
+
+      return vehicle;
+    },
+
+    cancelSlotBooking: async (_: any, { bookingId }: any, context: Context) => {
+      requireAuth(context);
+
+      const booking = await context.prisma.slotBooking.findUnique({
+        where: { id: bookingId },
+      });
+
+      if (!booking) {
+        throw new Error('Booking not found');
+      }
+
+      const isCustomer = context.user!.role === UserRole.CUSTOMER;
+      if (isCustomer && booking.customerMobile !== context.user!.mobile) {
+        throw new Error('Unauthorized');
+      }
+
+      if (booking.status !== SlotBookingStatus.PENDING) {
+        throw new Error('Only pending bookings can be cancelled');
+      }
+
+      return await context.prisma.slotBooking.update({
+        where: { id: bookingId },
+        data: { status: SlotBookingStatus.CANCELLED },
+        include: { center: true },
+      });
+    },
+
+    updateSystemConfig: async (_: any, { key, value }: any, context: Context) => {
+      requireAdmin(context);
+
+      return await context.prisma.systemConfig.upsert({
+        where: { key },
+        update: { value },
+        create: { key, value },
       });
     },
   },

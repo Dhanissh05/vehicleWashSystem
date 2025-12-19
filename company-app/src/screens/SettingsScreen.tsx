@@ -10,6 +10,7 @@ import {
   Alert,
   ActivityIndicator,
   Image,
+  Switch,
 } from 'react-native';
 import { useQuery, useMutation } from '@apollo/client';
 import { gql } from '@apollo/client';
@@ -90,6 +91,24 @@ const UPDATE_PROFILE = gql`
   }
 `;
 
+const GET_SYSTEM_CONFIG = gql`
+  query GetSystemConfig($key: String!) {
+    systemConfig(key: $key) {
+      key
+      value
+    }
+  }
+`;
+
+const UPDATE_SYSTEM_CONFIG = gql`
+  mutation UpdateSystemConfig($key: String!, $value: String!) {
+    updateSystemConfig(key: $key, value: $value) {
+      key
+      value
+    }
+  }
+`;
+
 export default function SettingsScreen({ navigation }: any) {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [name, setName] = useState('');
@@ -112,6 +131,9 @@ export default function SettingsScreen({ navigation }: any) {
 
   const { data, loading, refetch } = useQuery(GET_CENTER);
   const { data: userData, loading: userLoading, refetch: refetchUser } = useQuery(GET_ME);
+  const { data: slotConfigData, refetch: refetchSlotConfig } = useQuery(GET_SYSTEM_CONFIG, {
+    variables: { key: 'ENABLE_SLOT_BOOKING' },
+  });
   const [updateCenter, { loading: updating }] = useMutation(UPDATE_CENTER, {
     refetchQueries: [{ query: GET_CENTER }],
   });
@@ -123,9 +145,11 @@ export default function SettingsScreen({ navigation }: any) {
   const [updateProfile, { loading: updatingProfile }] = useMutation(UPDATE_PROFILE, {
     refetchQueries: [{ query: GET_ME }],
   });
+  const [updateSystemConfig] = useMutation(UPDATE_SYSTEM_CONFIG);
 
   const center = data?.centers?.[0];
   const currentUser = userData?.me;
+  const slotBookingEnabled = slotConfigData?.systemConfig?.value === 'true';
 
   const handlePickImage = async () => {
     try {
@@ -366,6 +390,21 @@ export default function SettingsScreen({ navigation }: any) {
       refetchUser();
     } catch (error: any) {
       Alert.alert('Error', error.message);
+    }
+  };
+
+  const handleToggleSlotBooking = async (value: boolean) => {
+    try {
+      await updateSystemConfig({
+        variables: {
+          key: 'ENABLE_SLOT_BOOKING',
+          value: value.toString(),
+        },
+      });
+      await refetchSlotConfig();
+      Alert.alert('Success', `Slot Booking ${value ? 'enabled' : 'disabled'} successfully`);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to update setting');
     }
   };
 
@@ -1036,6 +1075,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B7280',
     marginTop: 8,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  toggleInfo: {
+    flex: 1,
+    paddingRight: 16,
+  },
+  toggleLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  toggleHint: {
+    fontSize: 13,
+    color: '#6B7280',
     fontStyle: 'italic',
   },
   otpVerifyContainer: {

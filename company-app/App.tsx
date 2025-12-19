@@ -17,6 +17,7 @@ import PricingScreen from './src/screens/PricingScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import SlotsScreen from './src/screens/SlotsScreen';
 import WorkerProfileScreen from './src/screens/WorkerProfileScreen';
+import SlotBookingsScreen from './src/screens/SlotBookingsScreen';
 
 const Stack = createStackNavigator();
 
@@ -59,6 +60,7 @@ export default function App() {
           <Stack.Screen name="Workers" component={WorkersScreen} />
           <Stack.Screen name="Pricing" component={PricingScreen} />
           <Stack.Screen name="Slots" component={SlotsScreen} options={{ title: 'Slot Management' }} />
+          <Stack.Screen name="SlotBookings" component={SlotBookingsScreen} options={{ title: 'Slot Bookings' }} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
           <Stack.Screen name="WorkerProfile" component={WorkerProfileScreen} options={{ title: 'My Profile' }} />
         </Stack.Navigator>

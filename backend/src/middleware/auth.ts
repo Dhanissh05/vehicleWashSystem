@@ -22,13 +22,16 @@ export const authenticate = async (
   next: NextFunction
 ) => {
   try {
+    console.log('Auth middleware - checking authentication');
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('Auth failed: No bearer token in header');
       return res.status(401).json({ error: 'No token provided' });
     }
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+    console.log('Token present, length:', token.length);
 
     if (!process.env.JWT_SECRET) {
       console.error('JWT_SECRET not configured');
@@ -41,6 +44,8 @@ export const authenticate = async (
       mobile: string;
       role: string;
     };
+    
+    console.log('Token decoded for user:', decoded.id);
 
     // Verify user still exists and is active
     const user = await prisma.user.findUnique({

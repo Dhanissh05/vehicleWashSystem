@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, gql } from '@apollo/client';
+import CalendarIcon from './CalendarIcon';
 
 const GET_CENTER = gql`
   query GetCenter {
@@ -163,7 +164,17 @@ export default function MenuModal({ visible, onClose, navigation }: MenuModalPro
               onPress={() => handleNavigate('Slots')}
             >
               <Text style={styles.menuIcon}>🎫</Text>
-              <Text style={styles.menuText}>Slots</Text>
+              <Text style={styles.menuText}>Slot Management</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => handleNavigate('SlotBookings')}
+            >
+              <View style={styles.menuIcon}>
+                <CalendarIcon size={24} />
+              </View>
+              <Text style={styles.menuText}>Slot Bookings</Text>
             </TouchableOpacity>
 
             {userRole === 'WORKER' && (

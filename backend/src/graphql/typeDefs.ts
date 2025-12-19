@@ -58,6 +58,12 @@ export const typeDefs = gql`
     REFUNDED
   }
 
+  enum SlotBookingStatus {
+    PENDING
+    VERIFIED
+    CANCELLED
+  }
+
   type User {
     id: ID!
     mobile: String!
@@ -88,6 +94,7 @@ export const typeDefs = gql`
     model: String
     brand: String
     color: String
+    photoUrl: String
     serviceType: ServiceType!
     status: VehicleStatus!
     receivedAt: DateTime
@@ -183,6 +190,7 @@ export const typeDefs = gql`
     model: String
     brand: String
     color: String
+    photoUrl: String
     serviceType: ServiceType
     customerMobile: String!
     customerName: String
@@ -258,6 +266,50 @@ export const typeDefs = gql`
     enabled: Boolean!
   }
 
+  input CreateSlotBookingInput {
+    customerMobile: String!
+    customerName: String
+    vehicleNumber: String!
+    vehicleType: VehicleType!
+    carCategory: CarCategory
+    brand: String
+    model: String
+    color: String
+    photoUrl: String
+    carWash: Boolean
+    twoWheelerWash: Boolean
+    bodyRepair: Boolean
+    centerId: String!
+  }
+
+  input VerifySlotBookingInput {
+    bookingId: ID!
+    otp: String!
+  }
+
+  type SlotBooking {
+    id: ID!
+    customerMobile: String!
+    customerName: String
+    vehicleNumber: String!
+    vehicleType: String!
+    carCategory: String
+    brand: String
+    model: String
+    color: String
+    photoUrl: String
+    carWash: Boolean!
+    twoWheelerWash: Boolean!
+    bodyRepair: Boolean!
+    otp: String!
+    status: SlotBookingStatus!
+    rejectionReason: String
+    verifiedAt: DateTime
+    verifiedBy: String
+    center: Center!
+    createdAt: DateTime!
+  }
+
   input UpdateLogoInput {
     centerId: ID
     logoUrl: String!
@@ -296,6 +348,11 @@ export const typeDefs = gql`
     workerCode: String!
   }
 
+  type SystemConfig {
+    key: String!
+    value: String!
+  }
+
   type Query {
     # Authentication
     me: User!
@@ -324,9 +381,18 @@ export const typeDefs = gql`
     # Payments
     payments(status: PaymentStatus, limit: Int, offset: Int): [Payment!]!
     manualPendingPayments: [Payment!]!
+    myPayments: [Payment!]!
 
     # Centers
     centers: [Center!]!
+
+    # Slot Bookings
+    slotBookings(status: SlotBookingStatus): [SlotBooking!]!
+    mySlotBookings: [SlotBooking!]!
+    slotBookingById(id: ID!): SlotBooking
+
+    # System Config
+    systemConfig(key: String!): SystemConfig
   }
 
   type Mutation {
@@ -374,5 +440,13 @@ export const typeDefs = gql`
     updateCompanyLogo(input: UpdateLogoInput!): Center!
     updateCenter(input: UpdateCenterInput!): Center!
     updateCenterSlots(dailySlotsTwoWheeler: Int!, dailySlotsCar: Int!): Center!
+
+    # Slot Booking
+    createSlotBooking(input: CreateSlotBookingInput!): SlotBooking!
+    verifySlotBooking(input: VerifySlotBookingInput!): Vehicle!
+    cancelSlotBooking(bookingId: ID!): SlotBooking!
+
+    # System Config (Admin only)
+    updateSystemConfig(key: String!, value: String!): SystemConfig!
   }
 `;

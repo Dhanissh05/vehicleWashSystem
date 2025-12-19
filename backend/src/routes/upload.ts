@@ -104,12 +104,26 @@ router.post(
   upload.single('file'),
   async (req: AuthRequest, res) => {
     try {
+      console.log('=== Upload Request Received ===');
+      console.log('User:', req.user);
+      console.log('File present:', !!req.file);
+      console.log('Content-Type:', req.headers['content-type']);
+      
       if (!req.file) {
+        console.error('No file in request');
         return res.status(400).json({ error: 'No file uploaded' });
       }
 
+      console.log('File details:', {
+        filename: req.file.filename,
+        size: req.file.size,
+        mimetype: req.file.mimetype
+      });
+
       const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 4000}`;
       const fileUrl = `${baseUrl}/uploads/general/${req.file.filename}`;
+
+      console.log('Upload successful:', fileUrl);
 
       res.json({
         success: true,

@@ -7,7 +7,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -86,7 +86,8 @@ model Center {
   updatedAt               DateTime  @updatedAt
   
   // Relations
-  vehicles    Vehicle[]
+  vehicles      Vehicle[]
+  slotBookings  SlotBooking[]
 }
 
 model Vehicle {
@@ -97,6 +98,7 @@ model Vehicle {
   model           String?
   brand           String?
   color           String?
+  photoUrl        String?         // Vehicle photo URL
   serviceType     String          @default("WASH") // ServiceType: WASH, BODY_REPAIR
   status          String          @default("REGISTERED") // VehicleStatus: REGISTERED, RECEIVED, WASHING, READY_FOR_PICKUP, DELIVERED (for WASH) or BODY_REPAIR_ASSESSMENT, BODY_REPAIR_IN_PROGRESS, BODY_REPAIR_PAINTING, BODY_REPAIR_COMPLETE, READY_FOR_PICKUP, DELIVERED (for BODY_REPAIR)
   receivedAt      DateTime?
@@ -197,4 +199,33 @@ model SmsTemplate {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model SlotBooking {
+  id                String    @id @default(uuid())
+  customerMobile    String
+  customerName      String?
+  vehicleNumber     String
+  vehicleType       String
+  carCategory       String?
+  brand             String?
+  model             String?
+  color             String?
+  photoUrl          String?
+  carWash           Boolean   @default(false)
+  twoWheelerWash    Boolean   @default(false)
+  bodyRepair        Boolean   @default(false)
+  otp               String
+  status            String    @default("PENDING")
+  rejectionReason   String?   // Reason for rejection: NO_SHOW, MANUAL_CANCEL, etc.
+  verifiedAt        DateTime?
+  verifiedBy        String?
+  centerId          String
+  center            Center    @relation(fields: [centerId], references: [id])
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([customerMobile])
+  @@index([status])
+  @@index([otp])
 }

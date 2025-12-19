@@ -273,3 +273,90 @@ export const CONFIRM_ONLINE_PAYMENT = gql`
     }
   }
 `;
+
+export const MY_PAYMENTS = gql`
+  query MyPayments {
+    myPayments {
+      id
+      amount
+      method
+      status
+      createdAt
+      vehicle {
+        id
+        vehicleNumber
+        vehicleType
+        brand
+        model
+      }
+    }
+  }
+`;
+
+export const CREATE_SLOT_BOOKING = gql`
+  mutation CreateSlotBooking($input: CreateSlotBookingInput!) {
+    createSlotBooking(input: $input) {
+      id
+      customerMobile
+      customerName
+      vehicleNumber
+      vehicleType
+      carCategory
+      brand
+      model
+      color
+      photoUrl
+      carWash
+      twoWheelerWash
+      bodyRepair
+      otp
+      status
+      createdAt
+      center {
+        id
+        name
+      }
+    }
+  }
+`;
+
+export const MY_SLOT_BOOKINGS = gql`
+  query MySlotBookings {
+    mySlotBookings {
+      id
+      customerMobile
+      customerName
+      vehicleNumber
+      vehicleType
+      carWash
+      twoWheelerWash
+      bodyRepair
+      otp
+      status
+      rejectionReason
+      createdAt
+      center {
+        name
+        address
+      }
+    }
+  }
+`;
+
+export const CANCEL_SLOT_BOOKING = gql`
+  mutation CancelSlotBooking($bookingId: ID!) {
+    cancelSlotBooking(bookingId: $bookingId) {
+      id
+      status
+    }
+  }
+`;
+
+export const SYSTEM_CONFIG = gql`
+  query SystemConfig($key: String!) {
+    systemConfig(key: $key) {
+      key
+      value
+    }
+  }
+`;

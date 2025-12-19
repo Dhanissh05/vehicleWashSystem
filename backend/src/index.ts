@@ -13,6 +13,7 @@ import { otpRouter } from './routes/otp';
 import { webhookRouter } from './routes/webhooks';
 import { smsRouter } from './routes/sms';
 import { uploadRouter } from './routes/upload';
+import { initSlotBookingCron } from './services/slotBooking.service';
 
 dotenv.config();
 
@@ -91,6 +92,9 @@ const startServer = async () => {
   app.listen(PORT, HOST, () => {
     console.log(`🚀 Server ready at http://localhost:${PORT}/graphql`);
     console.log(`📝 REST API ready at http://localhost:${PORT}/api`);
+    
+    // Initialize slot booking auto-cancel cron job
+    initSlotBookingCron();
   });
 };
 

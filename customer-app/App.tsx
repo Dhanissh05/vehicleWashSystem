@@ -19,6 +19,9 @@ import HomeScreen from './src/screens/HomeScreen';
 import AddVehicleScreen from './src/screens/AddVehicleScreen';
 import TrackProgressScreen from './src/screens/TrackProgressScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import SlotBookingScreen from './src/screens/SlotBookingScreen';
+import BookedSlotsScreen from './src/screens/BookedSlotsScreen';
+import PaymentsScreen from './src/screens/PaymentsScreen';
 
 const Stack = createStackNavigator();
 
@@ -158,6 +161,21 @@ export default function App() {
             name="Profile" 
             component={ProfileScreen}
             options={{ title: 'My Profile' }}
+          />
+          <Stack.Screen 
+            name="SlotBooking" 
+            component={SlotBookingScreen}
+            options={{ title: 'Book a Slot' }}
+          />
+          <Stack.Screen 
+            name="BookedSlots" 
+            component={BookedSlotsScreen}
+            options={{ title: 'My Booked Slots' }}
+          />
+          <Stack.Screen 
+            name="Payments" 
+            component={PaymentsScreen}
+            options={{ title: 'Payment History' }}
           />
         </Stack.Navigator>
       </NavigationContainer>
