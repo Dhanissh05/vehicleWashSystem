@@ -6,3 +6,10 @@ dist
 .vscode
 coverage
 *.sqlite
+
+# Test and debug files
+check-*.js
+test-*.js
+fix-*.js
+*.db-journal
+prisma/prisma/*.db
