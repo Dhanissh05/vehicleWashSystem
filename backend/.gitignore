@@ -13,3 +13,7 @@ test-*.js
 fix-*.js
 *.db-journal
 prisma/prisma/*.db
+
+# Firebase credentials (NEVER commit)
+firebase-service-account.json
+*service-account*.json

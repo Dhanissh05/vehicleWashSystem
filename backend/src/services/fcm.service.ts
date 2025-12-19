@@ -1,18 +1,11 @@
 /**
  * Firebase Cloud Messaging (FCM) Service
  * 
- * This service handles push notifications to mobile devices.
- * 
- * Setup Instructions:
- * 1. Create a Firebase project at https://console.firebase.google.com
- * 2. Download service account JSON from Project Settings > Service Accounts
- * 3. Save the JSON file as firebase-service-account.json in the project root
- * 4. Set FIREBASE_SERVICE_ACCOUNT_PATH in .env
- * 
- * OR use the simpler HTTP v1 API:
- * 5. Get Server Key from Cloud Messaging settings
- * 6. Set FCM_SERVER_KEY in .env
+ * This service handles push notifications to mobile devices using Firebase Admin SDK.
  */
+
+import * as admin from 'firebase-admin';
+import * as path from 'path';
 
 interface PushNotificationPayload {
   title: string;
@@ -21,80 +14,80 @@ interface PushNotificationPayload {
   image?: string;
 }
 
+// Initialize Firebase Admin SDK
+let firebaseInitialized = false;
+
+function initializeFirebase() {
+  if (firebaseInitialized) return;
+
+  try {
+    const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH || './firebase-service-account.json';
+    const serviceAccount = require(path.resolve(serviceAccountPath));
+
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+      projectId: process.env.FIREBASE_PROJECT_ID || 'vehiclewash-system',
+    });
+
+    firebaseInitialized = true;
+    console.log('✅ Firebase Admin SDK initialized');
+  } catch (error) {
+    console.error('❌ Firebase Admin SDK initialization failed:', error);
+    console.warn('⚠️  Push notifications will not work until Firebase is configured');
+  }
+}
+
 /**
- * Send push notification using FCM HTTP v1 API
+ * Send push notification using Firebase Admin SDK
  * 
  * @param fcmToken - Device FCM registration token
  * @param payload - Notification payload
  * @returns Promise<boolean> - Success status
- * 
- * TODO: For production deployment:
- * 1. Uncomment the axios import and implementation below
- * 2. Add your FCM_SERVER_KEY to .env file
- * 3. Test with real device FCM tokens
  */
 export async function sendPushNotification(
   fcmToken: string,
   payload: PushNotificationPayload
 ): Promise<boolean> {
   try {
-    // Check if FCM is configured
-    if (!process.env.FCM_SERVER_KEY) {
-      console.warn('⚠️  FCM_SERVER_KEY not configured. Push notification not sent.');
-      console.log('📲 [MOCK] Push Notification:');
-      console.log(`   To: ${fcmToken.substring(0, 20)}...`);
-      console.log(`   Title: ${payload.title}`);
-      console.log(`   Body: ${payload.body}`);
-      return true; // Return true in development for testing
+    // Initialize Firebase if not already done
+    if (!firebaseInitialized) {
+      initializeFirebase();
     }
 
-    // TODO: Uncomment this section for production
-    /*
-    const axios = require('axios');
-    
-    const message = {
-      to: fcmToken,
+    // If Firebase is not configured, log mock notification
+    if (!firebaseInitialized) {
+      console.log('\n📲 PUSH NOTIFICATION (Mock - Firebase not configured)');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log(`Title: ${payload.title}`);
+      console.log(`Body: ${payload.body}`);
+      console.log(`Token: ${fcmToken.substring(0, 30)}...`);
+      if (payload.data) {
+        console.log(`Data: ${JSON.stringify(payload.data)}`);
+      }
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+      return true;
+    }
+
+    // Send actual push notification via Firebase
+    const message: admin.messaging.Message = {
+      token: fcmToken,
       notification: {
         title: payload.title,
         body: payload.body,
-        sound: 'default',
-        ...(payload.image && { image: payload.image }),
+        ...(payload.image && { imageUrl: payload.image }),
       },
       data: payload.data || {},
-      priority: 'high',
+      android: {
+        priority: 'high',
+        notification: {
+          sound: 'default',
+          channelId: 'default',
+        },
+      },
     };
 
-    const response = await axios.post(
-      'https://fcm.googleapis.com/fcm/send',
-      message,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `key=${process.env.FCM_SERVER_KEY}`,
-        },
-      }
-    );
-
-    if (response.data.success === 1) {
-      console.log(`✅ Push notification sent successfully to ${fcmToken.substring(0, 20)}...`);
-      return true;
-    } else {
-      console.error('❌ FCM send failed:', response.data);
-      return false;
-    }
-    */
-
-    // Development mock - remove this when implementing real FCM
-    console.log('\n📲 PUSH NOTIFICATION (Mock)');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log(`Title: ${payload.title}`);
-    console.log(`Body: ${payload.body}`);
-    console.log(`Token: ${fcmToken.substring(0, 30)}...`);
-    if (payload.data) {
-      console.log(`Data: ${JSON.stringify(payload.data)}`);
-    }
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-
+    const response = await admin.messaging().send(message);
+    console.log(`✅ Push notification sent successfully: ${response}`);
     return true;
   } catch (error) {
     console.error('Push notification error:', error);
