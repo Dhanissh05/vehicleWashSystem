@@ -429,6 +429,41 @@ export const resolvers = {
 
       return config || { key, value: 'false' };
     },
+
+    appVersion: async (_: any, __: any, context: Context) => {
+      // Get version configs from database
+      const companyVersionConfig = await context.prisma.systemConfig.findUnique({
+        where: { key: 'COMPANY_APP_VERSION' },
+      });
+      const customerVersionConfig = await context.prisma.systemConfig.findUnique({
+        where: { key: 'CUSTOMER_APP_VERSION' },
+      });
+      const companyDownloadConfig = await context.prisma.systemConfig.findUnique({
+        where: { key: 'COMPANY_APP_DOWNLOAD_URL' },
+      });
+      const customerDownloadConfig = await context.prisma.systemConfig.findUnique({
+        where: { key: 'CUSTOMER_APP_DOWNLOAD_URL' },
+      });
+      const forceUpdateConfig = await context.prisma.systemConfig.findUnique({
+        where: { key: 'FORCE_UPDATE' },
+      });
+      const updateMessageConfig = await context.prisma.systemConfig.findUnique({
+        where: { key: 'UPDATE_MESSAGE' },
+      });
+      const releaseNotesConfig = await context.prisma.systemConfig.findUnique({
+        where: { key: 'RELEASE_NOTES' },
+      });
+
+      return {
+        companyApp: companyVersionConfig?.value || '1.0.0',
+        customerApp: customerVersionConfig?.value || '1.0.0',
+        companyAppDownloadUrl: companyDownloadConfig?.value || null,
+        customerAppDownloadUrl: customerDownloadConfig?.value || null,
+        forceUpdate: forceUpdateConfig?.value === 'true',
+        updateMessage: updateMessageConfig?.value || 'A new version is available. Please update to continue.',
+        releaseNotes: releaseNotesConfig?.value || null,
+      };
+    },
   },
 
   Mutation: {

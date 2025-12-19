@@ -353,6 +353,16 @@ export const typeDefs = gql`
     value: String!
   }
 
+  type AppVersion {
+    companyApp: String!
+    customerApp: String!
+    companyAppDownloadUrl: String
+    customerAppDownloadUrl: String
+    forceUpdate: Boolean!
+    updateMessage: String
+    releaseNotes: String
+  }
+
   type Query {
     # Authentication
     me: User!
@@ -393,6 +403,9 @@ export const typeDefs = gql`
 
     # System Config
     systemConfig(key: String!): SystemConfig
+    
+    # App Version
+    appVersion: AppVersion!
   }
 
   type Mutation {

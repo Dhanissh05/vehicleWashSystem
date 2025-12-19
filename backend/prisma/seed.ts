@@ -144,6 +144,78 @@ async function main() {
       description: 'Enable slot booking feature',
     },
   });
+
+  // App version configuration
+  await prisma.systemConfig.upsert({
+    where: { key: 'COMPANY_APP_VERSION' },
+    update: {},
+    create: {
+      key: 'COMPANY_APP_VERSION',
+      value: '1.0.0',
+      description: 'Current company app version',
+    },
+  });
+
+  await prisma.systemConfig.upsert({
+    where: { key: 'CUSTOMER_APP_VERSION' },
+    update: {},
+    create: {
+      key: 'CUSTOMER_APP_VERSION',
+      value: '1.0.0',
+      description: 'Current customer app version',
+    },
+  });
+
+  await prisma.systemConfig.upsert({
+    where: { key: 'COMPANY_APP_DOWNLOAD_URL' },
+    update: {},
+    create: {
+      key: 'COMPANY_APP_DOWNLOAD_URL',
+      value: '',
+      description: 'Company app APK download URL',
+    },
+  });
+
+  await prisma.systemConfig.upsert({
+    where: { key: 'CUSTOMER_APP_DOWNLOAD_URL' },
+    update: {},
+    create: {
+      key: 'CUSTOMER_APP_DOWNLOAD_URL',
+      value: '',
+      description: 'Customer app APK download URL',
+    },
+  });
+
+  await prisma.systemConfig.upsert({
+    where: { key: 'FORCE_UPDATE' },
+    update: {},
+    create: {
+      key: 'FORCE_UPDATE',
+      value: 'false',
+      description: 'Force users to update to latest version',
+    },
+  });
+
+  await prisma.systemConfig.upsert({
+    where: { key: 'UPDATE_MESSAGE' },
+    update: {},
+    create: {
+      key: 'UPDATE_MESSAGE',
+      value: 'A new version is available with bug fixes and improvements.',
+      description: 'Message shown in update dialog',
+    },
+  });
+
+  await prisma.systemConfig.upsert({
+    where: { key: 'RELEASE_NOTES' },
+    update: {},
+    create: {
+      key: 'RELEASE_NOTES',
+      value: '• Bug fixes\n• Performance improvements\n• New features',
+      description: 'Release notes for latest version',
+    },
+  });
+
   console.log('✅ System config created');
 
   console.log('🎉 Seeding completed successfully!');

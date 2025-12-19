@@ -5,6 +5,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { ApolloProvider, ApolloClient, InMemoryCache, createHttpLink } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useVersionChecker } from './src/hooks/useVersionChecker';
 
 // Screens
 import LoginScreen from './src/screens/LoginScreen';
@@ -47,24 +48,33 @@ const apolloClient = new ApolloClient({
   cache: new InMemoryCache(),
 });
 
+function AppNavigator() {
+  // Check for version updates on app start
+  useVersionChecker();
+
+  return (
+    <NavigationContainer>
+      <Stack.Navigator screenOptions={{ headerShown: true }}>
+        <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="Dashboard" component={DashboardScreen} />
+        <Stack.Screen name="AddVehicle" component={AddVehicleScreen} options={{ title: 'Entry Vehicle' }} />
+        <Stack.Screen name="WashCycle" component={WashCycleScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="BodyRepairCycle" component={BodyRepairCycleScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="Workers" component={WorkersScreen} />
+        <Stack.Screen name="Pricing" component={PricingScreen} />
+        <Stack.Screen name="Slots" component={SlotsScreen} options={{ title: 'Slot Management' }} />
+        <Stack.Screen name="SlotBookings" component={SlotBookingsScreen} options={{ title: 'Slot Bookings' }} />
+        <Stack.Screen name="Settings" component={SettingsScreen} />
+        <Stack.Screen name="WorkerProfile" component={WorkerProfileScreen} options={{ title: 'My Profile' }} />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+
 export default function App() {
   return (
     <ApolloProvider client={apolloClient}>
-      <NavigationContainer>
-        <Stack.Navigator screenOptions={{ headerShown: true }}>
-          <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="Dashboard" component={DashboardScreen} />
-          <Stack.Screen name="AddVehicle" component={AddVehicleScreen} options={{ title: 'Entry Vehicle' }} />
-          <Stack.Screen name="WashCycle" component={WashCycleScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="BodyRepairCycle" component={BodyRepairCycleScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="Workers" component={WorkersScreen} />
-          <Stack.Screen name="Pricing" component={PricingScreen} />
-          <Stack.Screen name="Slots" component={SlotsScreen} options={{ title: 'Slot Management' }} />
-          <Stack.Screen name="SlotBookings" component={SlotBookingsScreen} options={{ title: 'Slot Bookings' }} />
-          <Stack.Screen name="Settings" component={SettingsScreen} />
-          <Stack.Screen name="WorkerProfile" component={WorkerProfileScreen} options={{ title: 'My Profile' }} />
-        </Stack.Navigator>
-      </NavigationContainer>
+      <AppNavigator />
     </ApolloProvider>
   );
 }

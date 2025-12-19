@@ -7,6 +7,7 @@ import { View, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { apolloClient } from './src/apollo/client';
+import { useVersionChecker } from './src/hooks/useVersionChecker';
 
 // Screens
 import LandingScreen from './src/screens/LandingScreen';
@@ -25,9 +26,12 @@ import PaymentsScreen from './src/screens/PaymentsScreen';
 
 const Stack = createStackNavigator();
 
-export default function App() {
+function AppNavigator() {
   const [isLoading, setIsLoading] = useState(true);
   const [initialRoute, setInitialRoute] = useState('Landing');
+
+  // Check for version updates on app start
+  useVersionChecker();
 
   useEffect(() => {
     checkAuthStatus();
@@ -93,8 +97,7 @@ export default function App() {
   }
 
   return (
-    <ApolloProvider client={apolloClient}>
-      <NavigationContainer>
+    <NavigationContainer>
         <Stack.Navigator 
           initialRouteName={initialRoute}
           screenOptions={{
@@ -179,6 +182,13 @@ export default function App() {
           />
         </Stack.Navigator>
       </NavigationContainer>
+  );
+}
+
+export default function App() {
+  return (
+    <ApolloProvider client={apolloClient}>
+      <AppNavigator />
     </ApolloProvider>
   );
 }
