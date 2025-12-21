@@ -14,11 +14,26 @@
     },
     "android": {
       "package": "com.vehiclewash.company",
+      "versionCode": 1,
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
+        "WRITE_EXTERNAL_STORAGE",
+        "NOTIFICATIONS"
       ]
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "color": "#ffffff"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "72c4c2fa-9844-49c2-ba3e-d2e0e8a16fca"
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
