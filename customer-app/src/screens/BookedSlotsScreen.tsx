@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useQuery } from '@apollo/client';
 import { MY_SLOT_BOOKINGS } from '../apollo/queries';
+import CalendarIcon from '../components/CalendarIcon';
 
 const BookedSlotsScreen = () => {
   const { data, loading, error, refetch } = useQuery(MY_SLOT_BOOKINGS, {
@@ -71,7 +72,7 @@ const BookedSlotsScreen = () => {
         }
       >
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyIcon}>📅</Text>
+          <CalendarIcon size={80} />
           <Text style={styles.emptyText}>No Booked Slots</Text>
           <Text style={styles.emptySubtext}>
             You haven't booked any slots yet.
@@ -232,14 +233,11 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
     paddingHorizontal: 20,
   },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
   emptyText: {
     fontSize: 20,
     fontWeight: '600',
     color: '#1A1A1A',
+    marginTop: 24,
     marginBottom: 8,
   },
   emptySubtext: {

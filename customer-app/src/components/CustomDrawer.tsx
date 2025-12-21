@@ -9,9 +9,19 @@ import {
   Animated,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useQuery } from '@apollo/client';
-import { CENTERS, SYSTEM_CONFIG } from '../apollo/queries';
+import { useQuery, gql } from '@apollo/client';
+import { SYSTEM_CONFIG } from '../apollo/queries';
 import CalendarIcon from './CalendarIcon';
+
+const GET_USER_PROFILE = gql`
+  query GetUserProfile {
+    me {
+      id
+      name
+      photoUrl
+    }
+  }
+`;
 
 interface MenuModalProps {
   visible: boolean;
@@ -21,12 +31,14 @@ interface MenuModalProps {
 
 export default function MenuModal({ visible, onClose, navigation }: MenuModalProps) {
   const [userName, setUserName] = useState('Guest');
-  const { data: centersData } = useQuery(CENTERS);
+  const { data: userData, refetch: refetchUser } = useQuery(GET_USER_PROFILE, {
+    fetchPolicy: 'network-only',
+  });
   const { data: configData, refetch: refetchConfig } = useQuery(SYSTEM_CONFIG, {
     variables: { key: 'ENABLE_SLOT_BOOKING' },
     fetchPolicy: 'network-only',
   });
-  const companyLogo = centersData?.centers?.[0]?.logoUrl;
+  const userPhoto = userData?.me?.photoUrl;
   const slideAnim = useRef(new Animated.Value(0)).current;
   const slotBookingEnabled = configData?.systemConfig?.value === 'true';
 
@@ -34,7 +46,8 @@ export default function MenuModal({ visible, onClose, navigation }: MenuModalPro
   useEffect(() => {
     if (visible) {
       loadUserData();
-      // Refetch config to get latest slot booking status
+      // Refetch user profile and config to get latest data
+      refetchUser();
       refetchConfig();
     }
   }, [visible]);
@@ -103,21 +116,23 @@ export default function MenuModal({ visible, onClose, navigation }: MenuModalPro
           style={[styles.menuContainer, { transform: [{ translateX }] }]}
           onStartShouldSetResponder={() => true}
         >
-          {/* Header with Company Logo */}
+          {/* Header with User Profile Picture */}
           <View style={styles.header}>
-            {companyLogo ? (
-              <Image 
-                source={{ uri: companyLogo }} 
-                style={styles.logo}
-                resizeMode="contain"
-              />
-            ) : (
-              <View style={styles.logoPlaceholder}>
-                <Text style={styles.logoPlaceholderText}>🚗</Text>
-              </View>
-            )}
+            <View style={styles.logoPlaceholder}>
+              {userPhoto ? (
+                <Image 
+                  source={{ uri: userPhoto }} 
+                  style={styles.profileImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Text style={styles.logoPlaceholderText}>
+                  {(userData?.me?.name || userName)?.charAt(0)?.toUpperCase() || '👤'}
+                </Text>
+              )}
+            </View>
             <Text style={styles.welcomeText}>Welcome</Text>
-            <Text style={styles.userName}>{userName}</Text>
+            <Text style={styles.userName}>{userData?.me?.name || userName}</Text>
           </View>
 
           {/* Menu Items */}
@@ -214,13 +229,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#3B82F6',
     alignItems: 'center',
   },
-  logo: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#fff',
-    marginBottom: 12,
-  },
   logoPlaceholder: {
     width: 80,
     height: 80,
@@ -229,6 +237,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
+    overflow: 'hidden',
+  },
+  profileImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
   },
   logoPlaceholderText: {
     fontSize: 40,

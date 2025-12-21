@@ -21,7 +21,7 @@ export default function HomeScreen({ navigation }: any) {
     fetchPolicy: 'network-only', // Always fetch from network, not cache
     pollInterval: 5000, // Poll every 5 seconds for real-time updates
   });
-  const { data: centerData, refetch: refetchCenter } = useQuery(CENTERS, {
+  const { data: centerData, refetch: refetchCenter, error: centerError } = useQuery(CENTERS, {
     fetchPolicy: 'network-only', // Always fetch from network, not cache
     pollInterval: 3000, // Poll every 3 seconds for slot updates
   });
@@ -63,7 +63,10 @@ export default function HomeScreen({ navigation }: any) {
     } else {
       console.log('No center data available');
     }
-  }, [data, loading, error, centerData]);
+    if (centerError) {
+      console.error('CENTERS query error:', centerError);
+    }
+  }, [data, loading, error, centerData, centerError]);
 
   // Load user data and refetch vehicles whenever screen comes into focus
   useFocusEffect(
@@ -298,7 +301,9 @@ export default function HomeScreen({ navigation }: any) {
           </>
         ) : (
           <View style={styles.slotAvailableBanner}>
-            <Text style={styles.slotAvailableTitle}>Loading slot information...</Text>
+            <Text style={styles.slotAvailableTitle}>
+              {centerError ? `Error: ${centerError.message}` : 'Loading slot information...'}
+            </Text>
           </View>
         )}
       </View>

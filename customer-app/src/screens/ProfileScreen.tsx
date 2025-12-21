@@ -255,7 +255,7 @@ const ProfileScreen = ({ navigation }: any) => {
       <Modal
         visible={showEditName}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setShowEditName(false)}
       >
         <View style={styles.modalOverlay}>
@@ -296,7 +296,7 @@ const ProfileScreen = ({ navigation }: any) => {
       <Modal
         visible={showChangePassword}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setShowChangePassword(false)}
       >
         <View style={styles.modalOverlay}>
