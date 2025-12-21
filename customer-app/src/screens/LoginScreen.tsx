@@ -15,34 +15,38 @@ import {
 } from 'react-native';
 import { useMutation, useLazyQuery, useQuery } from '@apollo/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SEND_OTP, VERIFY_OTP, CHECK_USER_EXISTS, CENTERS } from '../apollo/queries';
+import { LOGIN, CHECK_USER_EXISTS, CENTERS } from '../apollo/queries';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
 
 export default function LoginScreen({ navigation }: any) {
   const [mobile, setMobile] = useState('');
-  const [otp, setOtp] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const [checkUserExists, { loading: checkingUser }] = useLazyQuery(CHECK_USER_EXISTS);
-  const [sendOtp, { loading: sendingOtp }] = useMutation(SEND_OTP);
-  const [verifyOtp, { loading: verifyingOtp }] = useMutation(VERIFY_OTP);
+  const [login, { loading: loggingIn }] = useMutation(LOGIN);
   const { data: centerData } = useQuery(CENTERS);
   
   const center = centerData?.centers?.[0];
 
-  const handleSendOtp = async () => {
+  const handleLogin = async () => {
     if (mobile.length < 10) {
       Alert.alert('Error', 'Please enter a valid mobile number');
       return;
     }
 
+    if (!password || password.length < 6) {
+      Alert.alert('Error', 'Please enter your password');
+      return;
+    }
+
     try {
-      // Check if user exists before sending OTP
-      const { data } = await checkUserExists({ variables: { mobile } });
+      // Check if user exists
+      const { data: userData } = await checkUserExists({ variables: { mobile } });
       
-      if (!data?.checkUserExists) {
+      if (!userData?.checkUserExists) {
         Alert.alert(
           'User Not Registered',
           'Please sign up to continue.',
@@ -54,27 +58,16 @@ export default function LoginScreen({ navigation }: any) {
         return;
       }
 
-      await sendOtp({ variables: { mobile } });
-      setOtpSent(true);
-      Alert.alert('Success', 'OTP sent! Check the backend console for the OTP code.');
+      // Login with password
+      const { data } = await login({ variables: { mobile, password } });
+      
+      if (data?.login?.token) {
+        await AsyncStorage.setItem('token', data.login.token);
+        await AsyncStorage.setItem('user', JSON.stringify(data.login.user));
+        navigation.replace('Home');
+      }
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to send OTP');
-    }
-  };
-
-  const handleVerifyOtp = async () => {
-    if (otp.length !== 6) {
-      Alert.alert('Error', 'Please enter a valid 6-digit OTP');
-      return;
-    }
-
-    try {
-      const { data } = await verifyOtp({ variables: { mobile, code: otp } });
-      await AsyncStorage.setItem('token', data.verifyOtp.token);
-      await AsyncStorage.setItem('user', JSON.stringify(data.verifyOtp.user));
-      navigation.replace('Home');
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Invalid OTP');
+      Alert.alert('Error', error.message || 'Invalid mobile number or password');
     }
   };
 
@@ -111,100 +104,70 @@ export default function LoginScreen({ navigation }: any) {
 
         {/* Login Form Card */}
         <View style={styles.formCard}>
-          <Text style={styles.formTitle}>
-            {otpSent ? 'Enter OTP' : 'Welcome Back'}
-          </Text>
+          <Text style={styles.formTitle}>Welcome Back</Text>
           <Text style={styles.formSubtitle}>
-            {otpSent 
-              ? 'We sent a 6-digit code to your mobile' 
-              : 'Sign in to book your vehicle wash'}
+            Sign in to book your vehicle wash
           </Text>
 
-          {!otpSent ? (
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Mobile Number</Text>
-              <View style={styles.inputWrapper}>
-                <Text style={styles.countryCode}>+91</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter mobile number"
-                  placeholderTextColor="#9CA3AF"
-                  keyboardType="phone-pad"
-                  maxLength={10}
-                  value={mobile}
-                  onChangeText={setMobile}
-                />
-              </View>
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Mobile Number</Text>
+            <View style={styles.inputWrapper}>
+              <Text style={styles.countryCode}>+91</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter mobile number"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="phone-pad"
+                maxLength={10}
+                value={mobile}
+                onChangeText={setMobile}
+              />
             </View>
-          ) : (
-            <>
-              <View style={styles.mobileDisplay}>
-                <Text style={styles.mobileLabel}>Sent to:</Text>
-                <Text style={styles.mobileNumber}>+91 {mobile}</Text>
-                <TouchableOpacity onPress={() => {
-                  setOtpSent(false);
-                  setOtp('');
-                }}>
-                  <Text style={styles.changeButton}>Change</Text>
-                </TouchableOpacity>
-              </View>
+          </View>
 
-              <View style={styles.otpContainer}>
-                <TextInput
-                  style={styles.otpInput}
-                  placeholder="Enter 6-digit OTP"
-                  placeholderTextColor="#9CA3AF"
-                  keyboardType="number-pad"
-                  maxLength={6}
-                  value={otp}
-                  onChangeText={setOtp}
-                  autoFocus
-                />
-              </View>
-
-              <Text style={styles.otpHint}>
-                💡 Check the backend console for the OTP code
-              </Text>
-            </>
-          )}
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Password</Text>
+            <View style={styles.passwordInputWrapper}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="Enter your password"
+                placeholderTextColor="#9CA3AF"
+                secureTextEntry={!showPassword}
+                value={password}
+                onChangeText={setPassword}
+                autoCapitalize="none"
+              />
+              <TouchableOpacity
+                style={styles.eyeButton}
+                onPress={() => setShowPassword(!showPassword)}
+              >
+                <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
 
           <TouchableOpacity
-            style={[styles.button, (sendingOtp || verifyingOtp || checkingUser) && styles.buttonDisabled]}
-            onPress={otpSent ? handleVerifyOtp : handleSendOtp}
-            disabled={sendingOtp || verifyingOtp || checkingUser}
+            style={[styles.button, (loggingIn || checkingUser) && styles.buttonDisabled]}
+            onPress={handleLogin}
+            disabled={loggingIn || checkingUser}
           >
-            {(sendingOtp || verifyingOtp || checkingUser) ? (
+            {(loggingIn || checkingUser) ? (
               <ActivityIndicator color="#fff" />
             ) : (
               <>
-                <Text style={styles.buttonText}>
-                  {otpSent ? 'Verify & Continue' : 'Send OTP'}
-                </Text>
-                <Text style={styles.buttonIcon}>{otpSent ? '✓' : '→'}</Text>
+                <Text style={styles.buttonText}>Sign In</Text>
+                <Text style={styles.buttonIcon}>→</Text>
               </>
             )}
           </TouchableOpacity>
 
-          {otpSent && (
-            <TouchableOpacity
-              style={styles.resendContainer}
-              onPress={handleSendOtp}
-              disabled={sendingOtp}
-            >
-              <Text style={styles.resendText}>Didn't receive code? </Text>
-              <Text style={styles.resendLink}>Resend OTP</Text>
-            </TouchableOpacity>
-          )}
-
-          {!otpSent && (
-            <TouchableOpacity
-              style={styles.signupLinkContainer}
-              onPress={() => navigation.navigate('SignupStep1')}
-            >
-              <Text style={styles.signupText}>Don't have an account? </Text>
-              <Text style={styles.signupLink}>Sign Up</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            style={styles.signupLinkContainer}
+            onPress={() => navigation.navigate('SignupStep1')}
+          >
+            <Text style={styles.signupText}>Don't have an account? </Text>
+            <Text style={styles.signupLink}>Sign Up</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Features Section */}
@@ -328,51 +291,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1F2937',
   },
-  mobileDisplay: {
+  passwordInputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 20,
-  },
-  mobileLabel: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginRight: 8,
-  },
-  mobileNumber: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  changeButton: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#667eea',
-  },
-  otpContainer: {
-    marginBottom: 12,
-  },
-  otpInput: {
     borderWidth: 2,
-    borderColor: '#667eea',
+    borderColor: '#E5E7EB',
     borderRadius: 12,
-    padding: 16,
-    fontSize: 24,
-    textAlign: 'center',
-    letterSpacing: 8,
-    fontWeight: 'bold',
-    color: '#1F2937',
     backgroundColor: '#F9FAFB',
   },
-  otpHint: {
-    fontSize: 12,
-    color: '#6B7280',
-    textAlign: 'center',
-    marginBottom: 16,
-    fontStyle: 'italic',
+  passwordInput: {
+    flex: 1,
+    padding: 16,
+    fontSize: 16,
+    color: '#1F2937',
+  },
+  eyeButton: {
+    padding: 16,
+  },
+  eyeIcon: {
+    fontSize: 20,
   },
   button: {
     backgroundColor: '#667eea',
@@ -400,20 +337,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
-  },
-  resendContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 16,
-  },
-  resendText: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  resendLink: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#667eea',
   },
   signupLinkContainer: {
     flexDirection: 'row',
