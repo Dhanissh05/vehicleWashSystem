@@ -8,6 +8,11 @@ import {
   Alert,
   ActivityIndicator,
   Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
 import { useMutation, useQuery, gql } from '@apollo/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -63,78 +68,91 @@ export default function LoginScreen({ navigation }: any) {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.logoContainer}>
-          {center?.logoUrl ? (
-            <Image
-              source={{ uri: center.logoUrl }}
-              style={styles.logoImage}
-              resizeMode="contain"
-            />
-          ) : (
-            <View style={styles.logoPlaceholder}>
-              <Text style={styles.logoPlaceholderText}>🏢</Text>
-            </View>
-          )}
-        </View>
-        <Text style={styles.title}>{center?.name || 'Company Login'}</Text>
-        <Text style={styles.subtitle}>Admin & Worker Portal</Text>
-      </View>
-
-      <View style={styles.form}>
-        <Text style={styles.label}>Login As</Text>
-        <View style={styles.roleContainer}>
-          <TouchableOpacity
-            style={[styles.roleButton, selectedRole === 'ADMIN' && styles.roleButtonActive]}
-            onPress={() => setSelectedRole('ADMIN')}
-          >
-            <Text style={[styles.roleText, selectedRole === 'ADMIN' && styles.roleTextActive]}>
-              👨‍💼 Admin
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.roleButton, selectedRole === 'WORKER' && styles.roleButtonActive]}
-            onPress={() => setSelectedRole('WORKER')}
-          >
-            <Text style={[styles.roleText, selectedRole === 'WORKER' && styles.roleTextActive]}>
-              👷 Worker
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <Text style={styles.label}>Mobile Number</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter your mobile number"
-          keyboardType="phone-pad"
-          maxLength={10}
-          value={mobile}
-          onChangeText={setMobile}
-        />
-
-        <Text style={styles.label}>Password</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter your password"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
-
-        <TouchableOpacity
-          style={styles.button}
-          onPress={handleLogin}
-          disabled={loading}
+    <KeyboardAvoidingView 
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Login</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-    </View>
+          <View style={styles.header}>
+            <View style={styles.logoContainer}>
+              {center?.logoUrl ? (
+                <Image
+                  source={{ uri: center.logoUrl }}
+                  style={styles.logoImage}
+                  resizeMode="contain"
+                />
+              ) : (
+                <View style={styles.logoPlaceholder}>
+                  <Text style={styles.logoPlaceholderText}>🏢</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.title}>{center?.name || 'Main Wash Center'}</Text>
+            <Text style={styles.subtitle}>Admin & Worker Portal</Text>
+          </View>
+
+          <View style={styles.form}>
+            <Text style={styles.label}>Login As</Text>
+            <View style={styles.roleContainer}>
+              <TouchableOpacity
+                style={[styles.roleButton, selectedRole === 'ADMIN' && styles.roleButtonActive]}
+                onPress={() => setSelectedRole('ADMIN')}
+              >
+                <Text style={[styles.roleText, selectedRole === 'ADMIN' && styles.roleTextActive]}>
+                  👨‍💼 Admin
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.roleButton, selectedRole === 'WORKER' && styles.roleButtonActive]}
+                onPress={() => setSelectedRole('WORKER')}
+              >
+                <Text style={[styles.roleText, selectedRole === 'WORKER' && styles.roleTextActive]}>
+                  👷 Worker
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.label}>Mobile Number</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter your mobile number"
+              keyboardType="phone-pad"
+              maxLength={10}
+              value={mobile}
+              onChangeText={setMobile}
+            />
+
+            <Text style={styles.label}>Password</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter your password"
+              secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+              returnKeyType="done"
+              onSubmitEditing={handleLogin}
+            />
+
+            <TouchableOpacity
+              style={styles.button}
+              onPress={handleLogin}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>Login</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -142,6 +160,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
+  },
+  scrollContent: {
+    flexGrow: 1,
     padding: 20,
     justifyContent: 'center',
   },

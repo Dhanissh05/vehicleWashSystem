@@ -19,6 +19,8 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import SlotsScreen from './src/screens/SlotsScreen';
 import WorkerProfileScreen from './src/screens/WorkerProfileScreen';
 import SlotBookingsScreen from './src/screens/SlotBookingsScreen';
+import PushNotificationScreen from './src/screens/PushNotificationScreen';
+import ManageUsersScreen from './src/screens/ManageUsersScreen';
 
 const Stack = createStackNavigator();
 
@@ -46,6 +48,14 @@ const authLink = setContext(async (_, { headers }) => {
 const apolloClient = new ApolloClient({
   link: authLink.concat(httpLink),
   cache: new InMemoryCache(),
+  defaultOptions: {
+    watchQuery: {
+      fetchPolicy: 'network-only',
+    },
+    query: {
+      fetchPolicy: 'network-only',
+    },
+  },
 });
 
 function AppNavigator() {
@@ -64,6 +74,8 @@ function AppNavigator() {
         <Stack.Screen name="Pricing" component={PricingScreen} />
         <Stack.Screen name="Slots" component={SlotsScreen} options={{ title: 'Slot Management' }} />
         <Stack.Screen name="SlotBookings" component={SlotBookingsScreen} options={{ title: 'Slot Bookings' }} />
+        <Stack.Screen name="ManageUsers" component={ManageUsersScreen} options={{ title: 'Manage Users' }} />
+        <Stack.Screen name="PushNotification" component={PushNotificationScreen} options={{ title: 'Push Notification' }} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="WorkerProfile" component={WorkerProfileScreen} options={{ title: 'My Profile' }} />
       </Stack.Navigator>

@@ -7,6 +7,7 @@ import {
   Modal,
   Animated,
   Image,
+  ScrollView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, gql } from '@apollo/client';
@@ -134,7 +135,7 @@ export default function MenuModal({ visible, onClose, navigation }: MenuModalPro
           </View>
 
           {/* Menu Items */}
-          <View style={styles.menuSection}>
+          <ScrollView style={styles.menuSection} showsVerticalScrollIndicator={false}>
             <TouchableOpacity
               style={styles.menuItem}
               onPress={() => handleNavigate('Dashboard')}
@@ -199,10 +200,26 @@ export default function MenuModal({ visible, onClose, navigation }: MenuModalPro
 
                 <TouchableOpacity
                   style={styles.menuItem}
+                  onPress={() => handleNavigate('ManageUsers')}
+                >
+                  <Text style={styles.menuIcon}>👥</Text>
+                  <Text style={styles.menuText}>Manage Users</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.menuItem}
                   onPress={() => handleNavigate('Pricing')}
                 >
                   <Text style={styles.menuIcon}>💰</Text>
                   <Text style={styles.menuText}>Pricing</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => handleNavigate('PushNotification')}
+                >
+                  <Text style={styles.menuIcon}>📢</Text>
+                  <Text style={styles.menuText}>Push Notification</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -214,7 +231,7 @@ export default function MenuModal({ visible, onClose, navigation }: MenuModalPro
                 </TouchableOpacity>
               </>
             )}
-          </View>
+          </ScrollView>
 
           {/* Footer with Logout */}
           <View style={styles.footer}>
@@ -280,6 +297,7 @@ const styles = StyleSheet.create({
   menuSection: {
     flex: 1,
     paddingTop: 20,
+    paddingBottom: 10,
   },
   menuItem: {
     flexDirection: 'row',

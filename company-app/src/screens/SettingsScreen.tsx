@@ -233,7 +233,7 @@ export default function SettingsScreen({ navigation }: any) {
       await updateCenter({
         variables: {
           input: {
-            id: center.id,
+            centerId: center.id,
             name,
             address,
             mobile,
