@@ -18,3 +18,9 @@ build
 
 # Keep .env.example files
 !.env.example
+
+# Database files
+*.db
+
+# HTML strategy files
+PRICING_STRATEGY.html

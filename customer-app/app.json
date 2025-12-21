@@ -27,6 +27,14 @@
         {
           "color": "#ffffff"
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "newArchEnabled": false
+          }
+        }
       ]
     ],
     "extra": {
