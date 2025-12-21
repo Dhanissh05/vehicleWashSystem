@@ -94,6 +94,11 @@ const startServer = async () => {
   const httpServer = app.listen(PORT, HOST, () => {
     console.log(`🚀 Server ready at http://localhost:${PORT}/graphql`);
     console.log(`📝 REST API ready at http://localhost:${PORT}/api`);
+    console.log(`🔑 Environment Variables:`);
+    console.log(`   - DATABASE_URL: ${process.env.DATABASE_URL ? 'SET' : 'NOT SET'}`);
+    console.log(`   - JWT_SECRET: ${process.env.JWT_SECRET ? 'SET' : 'NOT SET'}`);
+    console.log(`   - FAST2SMS_API_KEY: ${process.env.FAST2SMS_API_KEY ? 'SET' : 'NOT SET'}`);
+    console.log(`   - FIREBASE_PROJECT_ID: ${process.env.FIREBASE_PROJECT_ID ? 'SET' : 'NOT SET'}`);
     
     // Initialize slot booking auto-cancel cron job
     initSlotBookingCron();

@@ -29,6 +29,8 @@ export async function sendSms(mobile: string, message: string): Promise<boolean>
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log(`To: ${mobile}`);
     console.log(`Message: ${message}`);
+    console.log(`API Key Present: ${!!process.env.FAST2SMS_API_KEY}`);
+    console.log(`API Key Length: ${process.env.FAST2SMS_API_KEY?.length || 0}`);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
     // If no SMS API key configured, just log (for development)
