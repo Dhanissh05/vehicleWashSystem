@@ -38,13 +38,14 @@
         }
       ]
     ],
-    "extra": {
-      "eas": {
-        "projectId": "72c4c2fa-9844-49c2-ba3e-d2e0e8a16fca"
-      }
-    },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "9956503d-6897-4d5a-b7e6-450edc821fb3"
+      }
+    },
+    "owner": "sandtell"
   }
 }
