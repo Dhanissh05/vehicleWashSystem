@@ -23,6 +23,7 @@
     "expo-print": "^15.0.7",
     "expo-sharing": "^14.0.7",
     "expo-status-bar": "~3.0.8",
+    "expo-updates": "~29.0.15",
     "graphql": "^16.8.1",
     "nativewind": "^2.0.11",
     "react": "19.1.0",

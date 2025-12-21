@@ -6,6 +6,12 @@
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/9956503d-6897-4d5a-b7e6-450edc821fb3"
+    },
     "assetBundlePatterns": [
       "**/*"
     ],

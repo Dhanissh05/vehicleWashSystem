@@ -295,7 +295,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   menuSection: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
     paddingTop: 20,
     paddingBottom: 10,
   },
