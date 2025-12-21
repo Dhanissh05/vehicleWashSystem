@@ -64,18 +64,18 @@ const getUser = (token: string) => {
 
 // Initialize Apollo Server
 const startServer = async () => {
-  const server = new ApolloServer<Context>({
+  const apolloServer = new ApolloServer<Context>({
     typeDefs,
     resolvers,
   });
 
-  await server.start();
+  await apolloServer.start();
 
   app.use(
     '/graphql',
     cors(),
     express.json({ limit: '10mb' }),
-    expressMiddleware(server, {
+    expressMiddleware(apolloServer, {
       context: async ({ req }): Promise<Context> => {
         const token = req.headers.authorization?.replace('Bearer ', '') || '';
         const user = getUser(token);
@@ -91,7 +91,7 @@ const startServer = async () => {
   const PORT = parseInt(process.env.PORT || '4000', 10);
   const HOST = '0.0.0.0'; // Bind to all interfaces for Railway
 
-  const server = app.listen(PORT, HOST, () => {
+  const httpServer = app.listen(PORT, HOST, () => {
     console.log(`🚀 Server ready at http://localhost:${PORT}/graphql`);
     console.log(`📝 REST API ready at http://localhost:${PORT}/api`);
     
@@ -100,9 +100,9 @@ const startServer = async () => {
   });
 
   // Set server timeout to 60 seconds
-  server.timeout = 60000;
-  server.keepAliveTimeout = 65000;
-  server.headersTimeout = 66000;
+  httpServer.timeout = 60000;
+  httpServer.keepAliveTimeout = 65000;
+  httpServer.headersTimeout = 66000;
 };
 
 // Start server
