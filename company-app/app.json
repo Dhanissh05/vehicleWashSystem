@@ -1,16 +1,10 @@
 {
   "expo": {
-    "name": "Vehicle Wash Company",
+    "name": "WashFlow Admin",
     "slug": "vehicle-wash-company",
     "version": "1.0.0",
     "orientation": "default",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -19,10 +13,6 @@
       "bundleIdentifier": "com.vehiclewash.company"
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
       "package": "com.vehiclewash.company",
       "permissions": [
         "CAMERA",
