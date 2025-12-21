@@ -21,7 +21,8 @@ const app = express();
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // Serve static uploaded files
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
@@ -73,7 +74,7 @@ const startServer = async () => {
   app.use(
     '/graphql',
     cors(),
-    express.json(),
+    express.json({ limit: '10mb' }),
     expressMiddleware(server, {
       context: async ({ req }): Promise<Context> => {
         const token = req.headers.authorization?.replace('Bearer ', '') || '';
@@ -90,13 +91,18 @@ const startServer = async () => {
   const PORT = parseInt(process.env.PORT || '4000', 10);
   const HOST = '0.0.0.0'; // Bind to all interfaces for Railway
 
-  app.listen(PORT, HOST, () => {
+  const server = app.listen(PORT, HOST, () => {
     console.log(`🚀 Server ready at http://localhost:${PORT}/graphql`);
     console.log(`📝 REST API ready at http://localhost:${PORT}/api`);
     
     // Initialize slot booking auto-cancel cron job
     initSlotBookingCron();
   });
+
+  // Set server timeout to 60 seconds
+  server.timeout = 60000;
+  server.keepAliveTimeout = 65000;
+  server.headersTimeout = 66000;
 };
 
 // Start server

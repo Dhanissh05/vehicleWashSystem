@@ -1335,61 +1335,69 @@ export const resolvers = {
 
     // Create payment when customer selects payment method
     createPayment: async (_: any, { input }: any, context: Context) => {
-      const user = requireAuth(context);
-      
-      const vehicle = await context.prisma.vehicle.findUnique({
-        where: { id: input.vehicleId },
-        include: { customer: true },
-      });
+      try {
+        const user = requireAuth(context);
+        
+        const vehicle = await context.prisma.vehicle.findUnique({
+          where: { id: input.vehicleId },
+          include: { customer: true },
+        });
 
-      if (!vehicle) {
-        throw new Error('Vehicle not found');
+        if (!vehicle) {
+          throw new Error('Vehicle not found');
+        }
+
+        if (vehicle.customerId !== user.id) {
+          throw new Error('Not authorized to create payment for this vehicle');
+        }
+
+        // Check if payment already exists
+        const existingPayment = await context.prisma.payment.findUnique({
+          where: { vehicleId: input.vehicleId },
+        });
+
+        if (existingPayment) {
+          throw new Error('Payment already exists for this vehicle');
+        }
+
+        // Get pricing
+        const pricing = await context.prisma.pricing.findFirst({
+          where: {
+            vehicleType: vehicle.vehicleType,
+            carCategory: vehicle.carCategory,
+            isActive: true,
+          },
+        });
+
+        if (!pricing) {
+          throw new Error('Pricing not configured for this vehicle type');
+        }
+
+        // Determine payment mode
+        const paymentMode = input.method === 'ONLINE' ? 'GATEWAY' : 'MANUAL';
+        const status = input.method === 'ONLINE' ? PaymentStatus.PENDING : PaymentStatus.MANUAL_PENDING;
+
+        const payment = await context.prisma.payment.create({
+          data: {
+            amount: pricing.price,
+            method: input.method,
+            paymentMode,
+            status,
+            vehicleId: input.vehicleId,
+            customerId: vehicle.customerId,
+          },
+          include: {
+            vehicle: true,
+            customer: true,
+          },
+        });
+
+        console.log(`✅ Payment created: ${payment.id} for vehicle ${vehicle.id}, method: ${input.method}`);
+        return payment;
+      } catch (error: any) {
+        console.error('❌ Error in createPayment:', error.message);
+        throw error;
       }
-
-      if (vehicle.customerId !== user.id) {
-        throw new Error('Not authorized to create payment for this vehicle');
-      }
-
-      // Check if payment already exists
-      const existingPayment = await context.prisma.payment.findUnique({
-        where: { vehicleId: input.vehicleId },
-      });
-
-      if (existingPayment) {
-        throw new Error('Payment already exists for this vehicle');
-      }
-
-      // Get pricing
-      const pricing = await context.prisma.pricing.findFirst({
-        where: {
-          vehicleType: vehicle.vehicleType,
-          carCategory: vehicle.carCategory,
-          isActive: true,
-        },
-      });
-
-      if (!pricing) {
-        throw new Error('Pricing not configured for this vehicle type');
-      }
-
-      // Determine payment mode
-      const paymentMode = input.method === 'ONLINE' ? 'GATEWAY' : 'MANUAL';
-      const status = input.method === 'ONLINE' ? PaymentStatus.PENDING : PaymentStatus.MANUAL_PENDING;
-
-      return await context.prisma.payment.create({
-        data: {
-          amount: pricing.price,
-          method: input.method,
-          paymentMode,
-          status,
-          vehicleId: input.vehicleId,
-          customerId: vehicle.customerId,
-        },
-        include: {
-          vehicle: true,
-          customer: true,
-        },
-      });
     },
 
     // Confirm online payment after Razorpay success

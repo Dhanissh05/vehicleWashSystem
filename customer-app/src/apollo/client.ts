@@ -12,8 +12,9 @@ if (!API_URL) {
 
 const httpLink = createHttpLink({
   uri: API_URL,
-  // Note: fetchOptions timeout doesn't work in React Native
-  // Using RetryLink below for timeout handling instead
+  fetchOptions: {
+    timeout: 30000, // 30 second timeout
+  },
 });
 
 const authLink = setContext(async (_, { headers }) => {
