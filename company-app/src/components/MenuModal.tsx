@@ -255,6 +255,7 @@ const styles = StyleSheet.create({
     width: 280,
     height: '100%',
     backgroundColor: '#fff',
+    flexDirection: 'column',
   },
   header: {
     padding: 20,
@@ -295,10 +296,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   menuSection: {
-    flexGrow: 1,
-    flexShrink: 1,
+    flex: 1,
     paddingTop: 20,
-    paddingBottom: 10,
   },
   menuItem: {
     flexDirection: 'row',
@@ -319,7 +318,9 @@ const styles = StyleSheet.create({
   footer: {
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 40,
   },
   logoutButton: {
     flexDirection: 'row',

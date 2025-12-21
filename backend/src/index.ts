@@ -2,7 +2,6 @@ import { ApolloServer } from '@apollo/server';
 import { expressMiddleware } from '@apollo/server/express4';
 import express from 'express';
 import cors from 'cors';
-import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -13,10 +12,10 @@ import { webhookRouter } from './routes/webhooks';
 import { smsRouter } from './routes/sms';
 import { uploadRouter } from './routes/upload';
 import { initSlotBookingCron } from './services/slotBooking.service';
+import prisma from './lib/prisma';
 
 dotenv.config();
 
-const prisma = new PrismaClient();
 const app = express();
 
 // Middleware

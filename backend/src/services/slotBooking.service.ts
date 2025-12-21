@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
 import cron from 'node-cron';
-
-const prisma = new PrismaClient();
+import prisma from '../lib/prisma';
 
 // Configuration: Auto-cancel timeout in hours (default 2 hours)
 const AUTO_CANCEL_TIMEOUT_HOURS = parseInt(process.env.SLOT_AUTO_CANCEL_HOURS || '2');
