@@ -50,6 +50,7 @@ const SlotBookingStatus = {
   PENDING: 'PENDING',
   VERIFIED: 'VERIFIED',
   CANCELLED: 'CANCELLED',
+  REJECTED: 'REJECTED',
 };
 
 const prisma = new PrismaClient();
@@ -306,6 +307,9 @@ export const resolvers = {
         orderBy: { createdAt: 'desc' },
         take: limit,
         skip: offset,
+        include: {
+          vehicles: true,
+        },
       });
     },
 
@@ -1161,12 +1165,22 @@ export const resolvers = {
         
         if (vehicle) {
           const isTwoWheeler = vehicle.vehicleType === 'TWO_WHEELER';
-          await context.prisma.center.update({
-            where: { id: vehicle.centerId },
-            data: isTwoWheeler
-              ? { availableSlotsTwoWheeler: { increment: 1 } }
-              : { availableSlotsCar: { increment: 1 } },
-          });
+          const currentAvailable = isTwoWheeler 
+            ? vehicle.center.availableSlotsTwoWheeler
+            : vehicle.center.availableSlotsCar;
+          const dailyLimit = isTwoWheeler
+            ? vehicle.center.dailySlotsTwoWheeler
+            : vehicle.center.dailySlotsCar;
+          
+          // Only increment if we haven't reached the daily limit
+          if (currentAvailable < dailyLimit) {
+            await context.prisma.center.update({
+              where: { id: vehicle.centerId },
+              data: isTwoWheeler
+                ? { availableSlotsTwoWheeler: { increment: 1 } }
+                : { availableSlotsCar: { increment: 1 } },
+            });
+          }
         }
       }
 
@@ -1596,6 +1610,10 @@ export const resolvers = {
           ...(input.name && { name: input.name }),
           ...(input.email && { email: input.email }),
           ...(input.mobile && { mobile: input.mobile }),
+          ...(input.dateOfBirth && { dateOfBirth: input.dateOfBirth }),
+          ...(input.address && { address: input.address }),
+          ...(input.city && { city: input.city }),
+          ...(input.pinCode && { pinCode: input.pinCode }),
           ...(input.isActive !== undefined && { isActive: input.isActive }),
         },
       });
@@ -1873,6 +1891,96 @@ export const resolvers = {
         update: { value },
         create: { key, value },
       });
+    },
+
+    sendBroadcastNotification: async (_: any, { title, message }: any, context: Context) => {
+      try {
+        requireAdmin(context);
+      } catch (error) {
+        console.error('❌ Auth check failed:', error);
+        throw error;
+      }
+
+      try {
+        console.log(`📢 Broadcasting notification: "${title}" to all customers...`);
+        
+        // Get all customers with FCM tokens
+        const customers = await context.prisma.user.findMany({
+          where: {
+            role: UserRole.CUSTOMER,
+            fcmToken: {
+              not: null,
+            },
+          },
+          select: {
+            id: true,
+            name: true,
+            fcmToken: true,
+          },
+        });
+
+        console.log(`📊 Found ${customers.length} customers with FCM tokens`);
+
+        if (customers.length === 0) {
+          return {
+            success: true,
+            sentCount: 0,
+            failedCount: 0,
+          };
+        }
+
+        // Send notification to each customer
+        let sentCount = 0;
+        let failedCount = 0;
+
+        const { sendPushNotification } = await import('../services/fcm.service');
+        const { sendExpoPushNotification } = await import('../services/expo-push.service');
+
+        for (const customer of customers) {
+          if (customer.fcmToken) {
+            try {
+              let success = false;
+              
+              // Check if it's an Expo push token (for testing in Expo Go)
+              if (customer.fcmToken.startsWith('ExponentPushToken[')) {
+                console.log(`📱 Sending Expo notification to ${customer.name}...`);
+                success = await sendExpoPushNotification(customer.fcmToken, title, message);
+              } else {
+                // Use Firebase FCM for production tokens
+                console.log(`📱 Sending FCM notification to ${customer.name}...`);
+                success = await sendPushNotification(customer.fcmToken, {
+                  title,
+                  body: message,
+                  data: {
+                    type: 'BROADCAST',
+                    timestamp: new Date().toISOString(),
+                  },
+                });
+              }
+
+              if (success) {
+                sentCount++;
+              } else {
+                failedCount++;
+              }
+            } catch (error) {
+              console.error(`Failed to send notification to ${customer.name}:`, error);
+              failedCount++;
+            }
+          }
+        }
+
+        console.log(`✅ Broadcast notification sent: ${sentCount} succeeded, ${failedCount} failed`);
+
+        return {
+          success: true,
+          sentCount,
+          failedCount,
+        };
+      } catch (error) {
+        console.error('❌ Error sending broadcast notification:', error);
+        throw new Error('Failed to send broadcast notification');
+      }
     },
   },
 

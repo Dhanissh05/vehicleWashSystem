@@ -2,7 +2,6 @@ import { ApolloServer } from '@apollo/server';
 import { expressMiddleware } from '@apollo/server/express4';
 import express from 'express';
 import cors from 'cors';
-import { json } from 'body-parser';
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
@@ -21,8 +20,8 @@ const prisma = new PrismaClient();
 const app = express();
 
 // Middleware
-app.use(cors() as any);
-app.use(json());
+app.use(cors());
+app.use(express.json());
 
 // Serve static uploaded files
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
@@ -73,6 +72,8 @@ const startServer = async () => {
 
   app.use(
     '/graphql',
+    cors(),
+    express.json(),
     expressMiddleware(server, {
       context: async ({ req }): Promise<Context> => {
         const token = req.headers.authorization?.replace('Bearer ', '') || '';

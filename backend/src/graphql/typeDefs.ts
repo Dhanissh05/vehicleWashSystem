@@ -62,6 +62,7 @@ export const typeDefs = gql`
     PENDING
     VERIFIED
     CANCELLED
+    REJECTED
   }
 
   type User {
@@ -69,6 +70,10 @@ export const typeDefs = gql`
     mobile: String!
     name: String
     email: String
+    dateOfBirth: String
+    address: String
+    city: String
+    pinCode: String
     role: UserRole!
     isActive: Boolean!
     latitude: Float
@@ -251,6 +256,10 @@ export const typeDefs = gql`
     name: String
     email: String
     mobile: String
+    dateOfBirth: String
+    address: String
+    city: String
+    pinCode: String
     isActive: Boolean
   }
 
@@ -461,5 +470,14 @@ export const typeDefs = gql`
 
     # System Config (Admin only)
     updateSystemConfig(key: String!, value: String!): SystemConfig!
+
+    # Push Notifications (Admin only)
+    sendBroadcastNotification(title: String!, message: String!): BroadcastNotificationResult!
+  }
+
+  type BroadcastNotificationResult {
+    success: Boolean!
+    sentCount: Int!
+    failedCount: Int!
   }
 `;

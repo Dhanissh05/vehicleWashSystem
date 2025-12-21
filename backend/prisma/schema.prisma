@@ -7,7 +7,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -16,6 +16,10 @@ model User {
   mobile        String    @unique
   name          String?
   email         String?   @unique
+  dateOfBirth   String?   // Date of birth in DD/MM/YYYY format
+  address       String?   // Full address
+  city          String?   // City
+  pinCode       String?   // 6-digit pin code
   role          String    @default("CUSTOMER") // UserRole: ADMIN, WORKER, CUSTOMER
   password      String?
   isActive      Boolean   @default(true)

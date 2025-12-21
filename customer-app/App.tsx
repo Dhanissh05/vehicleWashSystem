@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { apolloClient } from './src/apollo/client';
 import { useVersionChecker } from './src/hooks/useVersionChecker';
+import { usePushNotifications } from './src/hooks/usePushNotifications';
 
 // Screens
 import LandingScreen from './src/screens/LandingScreen';
@@ -16,6 +17,7 @@ import SignupStep1Screen from './src/screens/SignupStep1Screen';
 import SignupStep2Screen from './src/screens/SignupStep2Screen';
 import SignupStep3Screen from './src/screens/SignupStep3Screen';
 import SignupStep4Screen from './src/screens/SignupStep4Screen';
+import BiometricSetupScreen from './src/screens/BiometricSetupScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import AddVehicleScreen from './src/screens/AddVehicleScreen';
 import TrackProgressScreen from './src/screens/TrackProgressScreen';
@@ -32,6 +34,9 @@ function AppNavigator() {
 
   // Check for version updates on app start
   useVersionChecker();
+
+  // Register for push notifications (disabled for Expo Go, needs development build)
+  usePushNotifications();
 
   useEffect(() => {
     checkAuthStatus();
@@ -139,6 +144,11 @@ function AppNavigator() {
             name="SignupStep4" 
             component={SignupStep4Screen}
             options={{ title: 'Sign Up - Step 4' }}
+          />
+          <Stack.Screen 
+            name="BiometricSetup" 
+            component={BiometricSetupScreen}
+            options={{ headerShown: false }}
           />
           <Stack.Screen 
             name="Home" 

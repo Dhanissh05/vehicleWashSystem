@@ -50,20 +50,42 @@ export async function checkAndCancelExpiredSlotBookings() {
         },
       });
 
-      // Restore slot availability
+      // Restore slot availability (ensure it doesn't exceed daily limit)
       const slotField =
         booking.vehicleType === 'TWO_WHEELER'
           ? 'availableSlotsTwoWheeler'
           : 'availableSlotsCar';
+      
+      const dailySlotField =
+        booking.vehicleType === 'TWO_WHEELER'
+          ? 'dailySlotsTwoWheeler'
+          : 'dailySlotsCar';
 
-      await prisma.center.update({
+      // Get current center data
+      const center = await prisma.center.findUnique({
         where: { id: booking.centerId },
-        data: {
-          [slotField]: {
-            increment: 1,
-          },
-        },
       });
+
+      if (center) {
+        const currentAvailable = center[slotField];
+        const dailyLimit = center[dailySlotField];
+        
+        // Only increment if we haven't reached the daily limit
+        if (currentAvailable < dailyLimit) {
+          await prisma.center.update({
+            where: { id: booking.centerId },
+            data: {
+              [slotField]: {
+                increment: 1,
+              },
+            },
+          });
+        } else {
+          console.log(
+            `[Slot Auto-Cancel] Skipping slot restoration - already at daily limit (${currentAvailable}/${dailyLimit})`
+          );
+        }
+      }
 
       console.log(
         `[Slot Auto-Cancel] Cancelled booking ${booking.id} - ${booking.vehicleNumber} (Customer: ${booking.customerMobile}) - NO_SHOW`
