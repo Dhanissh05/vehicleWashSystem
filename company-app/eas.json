@@ -16,6 +16,10 @@
     "production": {
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://vehiclewash-api.sandtell.in/graphql",
+        "EXPO_PUBLIC_API_BASE_URL": "https://vehiclewash-api.sandtell.in"
       }
     }
   },
