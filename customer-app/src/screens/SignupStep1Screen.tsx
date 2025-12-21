@@ -11,9 +11,9 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { useMutation, useLazyQuery } from '@apollo/client';
+import { useLazyQuery } from '@apollo/client';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SEND_OTP, CHECK_USER_EXISTS } from '../apollo/queries';
+import { CHECK_USER_EXISTS } from '../apollo/queries';
 
 interface SignupStep1Props {
   navigation: any;
@@ -28,10 +28,10 @@ export default function SignupStep1Screen({ navigation }: SignupStep1Props) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [mobile, setMobile] = useState('');
+  const [dob, setDob] = useState('');
   const [errors, setErrors] = useState<any>({});
 
-  const [checkUserExists, { loading: checkingUser }] = useLazyQuery(CHECK_USER_EXISTS);
-  const [sendOtp, { loading }] = useMutation(SEND_OTP);
+  const [checkUserExists, { loading }] = useLazyQuery(CHECK_USER_EXISTS);
 
   // Client-side validation
   const validate = () => {
@@ -49,6 +49,30 @@ export default function SignupStep1Screen({ navigation }: SignupStep1Props) {
       newErrors.mobile = 'Mobile number is required';
     } else if (!/^[6-9]\d{9}$/.test(mobile)) {
       newErrors.mobile = 'Please enter a valid 10-digit mobile number';
+    }
+
+    // DOB validation
+    if (!dob.trim()) {
+      newErrors.dob = 'Date of Birth is required';
+    } else {
+      // Validate date format DD/MM/YYYY
+      const datePattern = /^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/\d{4}$/;
+      if (!datePattern.test(dob)) {
+        newErrors.dob = 'Please enter date in DD/MM/YYYY format';
+      } else {
+        // Check if date is valid and user is at least 13 years old
+        const [day, month, year] = dob.split('/').map(Number);
+        const birthDate = new Date(year, month - 1, day);
+        const today = new Date();
+        const age = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        
+        if (birthDate > today) {
+          newErrors.dob = 'Date of birth cannot be in the future';
+        } else if (age < 13 || (age === 13 && monthDiff < 0)) {
+          newErrors.dob = 'You must be at least 13 years old';
+        }
+      }
     }
 
     // Email validation (optional but must be valid if provided)
@@ -81,19 +105,15 @@ export default function SignupStep1Screen({ navigation }: SignupStep1Props) {
         return;
       }
 
-      // Send OTP to mobile
-      await sendOtp({ variables: { mobile } });
-      
-      // Navigate to OTP verification screen with user data
+      // Navigate to address details screen with user data
       navigation.navigate('SignupStep2', {
         name,
         email: email || null,
         mobile,
+        dob,
       });
-
-      Alert.alert('OTP Sent', 'Please check the backend console for your OTP code.');
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to send OTP');
+      Alert.alert('Error', error.message || 'Failed to verify user');
     }
   };
 
@@ -183,6 +203,36 @@ export default function SignupStep1Screen({ navigation }: SignupStep1Props) {
             )}
           </View>
 
+          {/* DOB Input */}
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>
+              Date of Birth <Text style={styles.required}>*</Text>
+            </Text>
+            <TextInput
+              style={[styles.input, errors.dob && styles.inputError]}
+              placeholder="DD/MM/YYYY"
+              placeholderTextColor="#9CA3AF"
+              value={dob}
+              onChangeText={(text) => {
+                // Auto-format date as user types
+                let formatted = text.replace(/[^0-9]/g, '');
+                if (formatted.length >= 2) {
+                  formatted = formatted.slice(0, 2) + '/' + formatted.slice(2);
+                }
+                if (formatted.length >= 5) {
+                  formatted = formatted.slice(0, 5) + '/' + formatted.slice(5, 9);
+                }
+                setDob(formatted);
+                if (errors.dob) setErrors({ ...errors, dob: null });
+              }}
+              keyboardType="number-pad"
+              maxLength={10}
+            />
+            {errors.dob && (
+              <Text style={styles.errorText}>{errors.dob}</Text>
+            )}
+          </View>
+
           {/* Mobile Input */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>
@@ -210,11 +260,11 @@ export default function SignupStep1Screen({ navigation }: SignupStep1Props) {
 
           {/* Continue Button */}
           <TouchableOpacity
-            style={[styles.button, (loading || checkingUser) && styles.buttonDisabled]}
+            style={[styles.button, loading && styles.buttonDisabled]}
             onPress={handleContinue}
-            disabled={loading || checkingUser}
+            disabled={loading}
           >
-            {(loading || checkingUser) ? (
+            {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
               <>
@@ -244,6 +294,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
+    paddingBottom: 40,
   },
   header: {
     paddingTop: 60,

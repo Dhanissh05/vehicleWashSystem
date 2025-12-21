@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,15 +6,11 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
 } from 'react-native';
-import { useMutation } from '@apollo/client';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
-import { VERIFY_OTP, SEND_OTP, UPDATE_USER } from '../apollo/queries';
 
 interface SignupStep2Props {
   navigation: any;
@@ -22,120 +18,61 @@ interface SignupStep2Props {
 }
 
 /**
- * SIGNUP SCREEN 2: OTP Verification
- * Verifies OTP sent to mobile number
- * Allows resend OTP functionality
+ * SIGNUP SCREEN 2: Address Details
+ * Collects: Address (required), City (required), Pin code (required)
  */
 export default function SignupStep2Screen({ navigation, route }: SignupStep2Props) {
-  const { name, email, mobile } = route.params;
+  const { name, email, mobile, dob } = route.params;
   
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
-  const [timer, setTimer] = useState(60);
-  const [canResend, setCanResend] = useState(false);
-  
-  const inputRefs = useRef<any>([]);
+  const [address, setAddress] = useState('');
+  const [city, setCity] = useState('');
+  const [pinCode, setPinCode] = useState('');
+  const [errors, setErrors] = useState<any>({});
 
-  const [verifyOtp, { loading: verifying }] = useMutation(VERIFY_OTP);
-  const [sendOtp, { loading: resending }] = useMutation(SEND_OTP);
-  const [updateUser, { loading: updating }] = useMutation(UPDATE_USER);
+  // Validation
+  const validate = () => {
+    const newErrors: any = {};
 
-  // Timer for resend OTP
-  useEffect(() => {
-    if (timer > 0) {
-      const interval = setInterval(() => {
-        setTimer((prev) => prev - 1);
-      }, 1000);
-      return () => clearInterval(interval);
-    } else {
-      setCanResend(true);
+    // Address validation
+    if (!address.trim()) {
+      newErrors.address = 'Address is required';
+    } else if (address.trim().length < 10) {
+      newErrors.address = 'Please enter a complete address';
     }
-  }, [timer]);
 
-  const handleOtpChange = (value: string, index: number) => {
-    // Only allow numbers
-    if (!/^\d*$/.test(value)) return;
-
-    const newOtp = [...otp];
-    newOtp[index] = value;
-    setOtp(newOtp);
-
-    // Auto-focus next input
-    if (value && index < 5) {
-      inputRefs.current[index + 1]?.focus();
+    // City validation
+    if (!city.trim()) {
+      newErrors.city = 'City is required';
+    } else if (city.trim().length < 2) {
+      newErrors.city = 'Please enter a valid city name';
     }
+
+    // Pin code validation
+    if (!pinCode) {
+      newErrors.pinCode = 'Pin code is required';
+    } else if (!/^\d{6}$/.test(pinCode)) {
+      newErrors.pinCode = 'Please enter a valid 6-digit pin code';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  const handleKeyPress = (e: any, index: number) => {
-    // Handle backspace
-    if (e.nativeEvent.key === 'Backspace' && !otp[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus();
-    }
-  };
-
-  const handleVerifyOtp = async () => {
-    const otpCode = otp.join('');
-    
-    if (otpCode.length !== 6) {
-      Alert.alert('Error', 'Please enter the complete 6-digit OTP');
+  const handleContinue = () => {
+    if (!validate()) {
       return;
     }
 
-    try {
-      const { data } = await verifyOtp({
-        variables: { mobile, code: otpCode },
-      });
-
-      // Store token and user data in AsyncStorage
-      if (data?.verifyOtp?.token) {
-        await AsyncStorage.setItem('token', data.verifyOtp.token);
-        await AsyncStorage.setItem('user', JSON.stringify(data.verifyOtp.user));
-      }
-
-      // Update user with name and email
-      if (data?.verifyOtp?.user?.id) {
-        await updateUser({
-          variables: {
-            input: {
-              userId: data.verifyOtp.user.id,
-              name,
-              email: email || undefined,
-            },
-          },
-        });
-
-        // Update AsyncStorage with the new name and email
-        const updatedUser = {
-          ...data.verifyOtp.user,
-          name,
-          email: email || data.verifyOtp.user.email,
-        };
-        await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
-      }
-
-      // Navigate to password creation screen
-      navigation.navigate('SignupStep3', {
-        name,
-        email,
-        mobile,
-      });
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Invalid OTP. Please try again.');
-      // Clear OTP fields
-      setOtp(['', '', '', '', '', '']);
-      inputRefs.current[0]?.focus();
-    }
-  };
-
-  const handleResendOtp = async () => {
-    try {
-      await sendOtp({ variables: { mobile } });
-      setTimer(60);
-      setCanResend(false);
-      setOtp(['', '', '', '', '', '']);
-      Alert.alert('Success', 'OTP has been resent to your mobile number.');
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to resend OTP');
-    }
+    // Navigate to password creation screen with user data
+    navigation.navigate('SignupStep3', {
+      name,
+      email,
+      mobile,
+      dob,
+      address,
+      city,
+      pinCode,
+    });
   };
 
   return (
@@ -162,10 +99,10 @@ export default function SignupStep2Screen({ navigation, route }: SignupStep2Prop
           </TouchableOpacity>
 
           <View style={styles.iconContainer}>
-            <Text style={styles.iconText}>📱</Text>
+            <Text style={styles.iconText}>📍</Text>
           </View>
-          <Text style={styles.title}>Verify Mobile</Text>
-          <Text style={styles.subtitle}>Enter the OTP sent to your phone</Text>
+          <Text style={styles.title}>Address Details</Text>
+          <Text style={styles.subtitle}>Where can we reach you?</Text>
         </LinearGradient>
 
         {/* Form Card */}
@@ -181,67 +118,81 @@ export default function SignupStep2Screen({ navigation, route }: SignupStep2Prop
           </View>
 
           <Text style={styles.stepTitle}>Step 2 of 4</Text>
-          <Text style={styles.stepSubtitle}>Verify your mobile number</Text>
+          <Text style={styles.stepSubtitle}>Tell us your location</Text>
 
-          {/* Mobile Display */}
-          <View style={styles.mobileDisplay}>
-            <Text style={styles.mobileLabel}>OTP sent to:</Text>
-            <Text style={styles.mobileNumber}>+91 {mobile}</Text>
-          </View>
-
-          {/* OTP Input */}
-          <View style={styles.otpContainer}>
-            {otp.map((digit, index) => (
-              <TextInput
-                key={index}
-                ref={(ref) => (inputRefs.current[index] = ref)}
-                style={styles.otpInput}
-                value={digit}
-                onChangeText={(value) => handleOtpChange(value, index)}
-                onKeyPress={(e) => handleKeyPress(e, index)}
-                keyboardType="number-pad"
-                maxLength={1}
-                autoFocus={index === 0}
-              />
-            ))}
-          </View>
-
-          <Text style={styles.otpHint}>
-            💡 Check the backend console for the OTP code
-          </Text>
-
-          {/* Timer / Resend */}
-          <View style={styles.resendContainer}>
-            {!canResend ? (
-              <Text style={styles.timerText}>
-                Resend OTP in {timer}s
-              </Text>
-            ) : (
-              <TouchableOpacity
-                onPress={handleResendOtp}
-                disabled={resending}
-              >
-                <Text style={styles.resendButton}>
-                  {resending ? 'Sending...' : 'Resend OTP'}
-                </Text>
-              </TouchableOpacity>
+          {/* Address Input */}
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>
+              Address <Text style={styles.required}>*</Text>
+            </Text>
+            <TextInput
+              style={[styles.input, styles.textArea, errors.address && styles.inputError]}
+              placeholder="Enter your full address"
+              placeholderTextColor="#9CA3AF"
+              value={address}
+              onChangeText={(text) => {
+                setAddress(text);
+                if (errors.address) setErrors({ ...errors, address: null });
+              }}
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+            />
+            {errors.address && (
+              <Text style={styles.errorText}>{errors.address}</Text>
             )}
           </View>
 
-          {/* Verify Button */}
+          {/* City Input */}
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>
+              City <Text style={styles.required}>*</Text>
+            </Text>
+            <TextInput
+              style={[styles.input, errors.city && styles.inputError]}
+              placeholder="Enter your city"
+              placeholderTextColor="#9CA3AF"
+              value={city}
+              onChangeText={(text) => {
+                setCity(text);
+                if (errors.city) setErrors({ ...errors, city: null });
+              }}
+              autoCapitalize="words"
+            />
+            {errors.city && (
+              <Text style={styles.errorText}>{errors.city}</Text>
+            )}
+          </View>
+
+          {/* Pin Code Input */}
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>
+              Pin Code <Text style={styles.required}>*</Text>
+            </Text>
+            <TextInput
+              style={[styles.input, errors.pinCode && styles.inputError]}
+              placeholder="Enter 6-digit pin code"
+              placeholderTextColor="#9CA3AF"
+              value={pinCode}
+              onChangeText={(text) => {
+                setPinCode(text.replace(/[^0-9]/g, ''));
+                if (errors.pinCode) setErrors({ ...errors, pinCode: null });
+              }}
+              keyboardType="number-pad"
+              maxLength={6}
+            />
+            {errors.pinCode && (
+              <Text style={styles.errorText}>{errors.pinCode}</Text>
+            )}
+          </View>
+
+          {/* Continue Button */}
           <TouchableOpacity
-            style={[styles.button, (verifying || updating) && styles.buttonDisabled]}
-            onPress={handleVerifyOtp}
-            disabled={verifying || updating}
+            style={styles.button}
+            onPress={handleContinue}
           >
-            {(verifying || updating) ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Text style={styles.buttonText}>Verify OTP</Text>
-                <Text style={styles.buttonIcon}>→</Text>
-              </>
-            )}
+            <Text style={styles.buttonText}>Continue</Text>
+            <Text style={styles.buttonIcon}>→</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -256,6 +207,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
+    paddingBottom: 40,
   },
   header: {
     paddingTop: 60,
@@ -344,60 +296,38 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginBottom: 24,
   },
-  mobileDisplay: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 24,
+  inputContainer: {
+    marginBottom: 20,
   },
-  mobileLabel: {
+  label: {
     fontSize: 14,
-    color: '#6B7280',
-    marginRight: 8,
-  },
-  mobileNumber: {
-    fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
+    color: '#374151',
+    marginBottom: 8,
   },
-  otpContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
+  required: {
+    color: '#EF4444',
   },
-  otpInput: {
-    width: 48,
-    height: 56,
-    borderWidth: 2,
-    borderColor: '#667eea',
-    borderRadius: 12,
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    color: '#1F2937',
+  input: {
     backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: '#1F2937',
   },
-  otpHint: {
+  textArea: {
+    minHeight: 80,
+    paddingTop: 12,
+  },
+  inputError: {
+    borderColor: '#EF4444',
+  },
+  errorText: {
+    color: '#EF4444',
     fontSize: 12,
-    color: '#6B7280',
-    textAlign: 'center',
-    marginBottom: 16,
-    fontStyle: 'italic',
-  },
-  resendContainer: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  timerText: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  resendButton: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#667eea',
+    marginTop: 4,
   },
   button: {
     backgroundColor: '#667eea',
@@ -411,6 +341,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
+    marginTop: 8,
   },
   buttonDisabled: {
     opacity: 0.6,

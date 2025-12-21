@@ -11,9 +11,7 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { useMutation } from '@apollo/client';
 import { LinearGradient } from 'expo-linear-gradient';
-import { UPDATE_PASSWORD } from '../apollo/queries';
 
 interface SignupStep3Props {
   navigation: any;
@@ -21,19 +19,17 @@ interface SignupStep3Props {
 }
 
 /**
- * SIGNUP SCREEN 3: Create Password
- * User creates a secure password for their account
- * Password strength validation included
+ * SIGNUP SCREEN 3: Password Creation
+ * Collects and validates password
+ * Passes to Step 4 for OTP verification
  */
 export default function SignupStep3Screen({ navigation, route }: SignupStep3Props) {
-  const { name, email, mobile } = route.params;
+  const { name, email, mobile, dob, address, city, pinCode } = route.params;
   
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<any>({});
-
-  const [updatePassword, { loading }] = useMutation(UPDATE_PASSWORD);
 
   // Password strength validation
   const validatePassword = () => {
@@ -66,23 +62,17 @@ export default function SignupStep3Screen({ navigation, route }: SignupStep3Prop
       return;
     }
 
-    try {
-      await updatePassword({
-        variables: {
-          mobile,
-          password,
-        },
-      });
-
-      // Navigate to address selection screen
-      navigation.navigate('SignupStep4', { 
-        name,
-        email,
-        mobile 
-      });
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to set password');
-    }
+    // Navigate to OTP verification screen with all data including password
+    navigation.navigate('SignupStep4', { 
+      name,
+      email,
+      mobile,
+      dob,
+      address,
+      city,
+      pinCode,
+      password,
+    });
   };
 
   const getPasswordStrength = () => {
@@ -215,18 +205,11 @@ export default function SignupStep3Screen({ navigation, route }: SignupStep3Prop
 
           {/* Create Account Button */}
           <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
+            style={styles.button}
             onPress={handleCreateAccount}
-            disabled={loading}
           >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Text style={styles.buttonText}>Create Account</Text>
-                <Text style={styles.buttonIcon}>→</Text>
-              </>
-            )}
+            <Text style={styles.buttonText}>Continue to Verification</Text>
+            <Text style={styles.buttonIcon}>→</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -241,6 +224,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
+    paddingBottom: 40,
   },
   header: {
     paddingTop: 60,

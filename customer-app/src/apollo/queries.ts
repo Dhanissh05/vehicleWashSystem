@@ -45,6 +45,10 @@ export const UPDATE_USER = gql`
       mobile
       name
       email
+      dateOfBirth
+      address
+      city
+      pinCode
     }
   }
 `;
@@ -70,6 +74,21 @@ export const UPDATE_FCM_TOKEN = gql`
 export const SIGNUP = gql`
   mutation Signup($input: SignupInput!) {
     signup(input: $input) {
+      token
+      user {
+        id
+        mobile
+        name
+        email
+        role
+      }
+    }
+  }
+`;
+
+export const LOGIN = gql`
+  mutation Login($mobile: String!, $password: String!) {
+    login(mobile: $mobile, password: $password) {
       token
       user {
         id

@@ -1,29 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   StyleSheet,
   Alert,
   ActivityIndicator,
-  Switch,
   Platform,
   ScrollView,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useMutation } from '@apollo/client';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as LocalAuthentication from 'expo-local-authentication';
-import { gql } from '@apollo/client';
-
-const SETUP_BIOMETRIC = gql`
-  mutation SetupBiometric($input: BiometricSetupInput!) {
-    setupBiometric(input: $input) {
-      id
-      biometricEnabled
-    }
-  }
-`;
+import { SEND_OTP, VERIFY_OTP, UPDATE_USER, UPDATE_PASSWORD } from '../apollo/queries';
 
 interface SignupStep4Props {
   navigation: any;
@@ -31,136 +22,161 @@ interface SignupStep4Props {
 }
 
 /**
- * SIGNUP SCREEN 4: Biometric Setup
- * Allows user to enable biometric authentication (Face ID / Touch ID / Fingerprint)
- * Uses device secure storage (Android Keystore / iOS Keychain)
+ * SIGNUP SCREEN 4: OTP Verification
+ * Verifies OTP sent to mobile number
+ * Completes the signup process
  */
 export default function SignupStep4Screen({ navigation, route }: SignupStep4Props) {
-  const { mobile } = route.params;
+  const { name, email, mobile, dob, address, city, pinCode, password } = route.params;
   
-  const [biometricEnabled, setBiometricEnabled] = useState(false);
-  const [biometricAvailable, setBiometricAvailable] = useState(false);
-  const [biometricType, setBiometricType] = useState<string>('');
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [timer, setTimer] = useState(60);
+  const [canResend, setCanResend] = useState(false);
+  
+  const inputRefs = useRef<any>([]);
 
-  const [setupBiometric, { loading }] = useMutation(SETUP_BIOMETRIC);
+  const [sendOtp, { loading: sending }] = useMutation(SEND_OTP);
+  const [verifyOtp, { loading: verifying }] = useMutation(VERIFY_OTP);
+  const [updateUser, { loading: updatingUser }] = useMutation(UPDATE_USER);
+  const [updatePassword, { loading: updatingPassword }] = useMutation(UPDATE_PASSWORD);
 
-  React.useEffect(() => {
-    checkBiometricAvailability();
+  // Send OTP on component mount
+  useEffect(() => {
+    handleSendOtp();
   }, []);
 
-  const checkBiometricAvailability = async () => {
-    try {
-      const compatible = await LocalAuthentication.hasHardwareAsync();
-      const enrolled = await LocalAuthentication.isEnrolledAsync();
-      
-      if (compatible && enrolled) {
-        setBiometricAvailable(true);
-        
-        const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-        if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
-          setBiometricType('Face ID');
-        } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
-          setBiometricType('Fingerprint');
-        } else if (types.includes(LocalAuthentication.AuthenticationType.IRIS)) {
-          setBiometricType('Iris');
-        } else {
-          setBiometricType('Biometric');
-        }
-      }
-    } catch (error) {
-      console.error('Error checking biometric availability:', error);
-    }
-  };
-
-  const handleEnableBiometric = async (enabled: boolean) => {
-    if (enabled) {
-      try {
-        // Authenticate user with biometric
-        const result = await LocalAuthentication.authenticateAsync({
-          promptMessage: `Enable ${biometricType} login`,
-          fallbackLabel: 'Use password instead',
-          disableDeviceFallback: false,
-        });
-
-        if (result.success) {
-          // Generate a secure key/token for biometric authentication
-          const biometricKey = `biometric_${mobile}_${Date.now()}`;
-          
-          // Store securely in AsyncStorage (in production, use SecureStore)
-          await AsyncStorage.setItem(`biometric_key_${mobile}`, biometricKey);
-          
-          setBiometricEnabled(true);
-          
-          // Update backend
-          try {
-            await setupBiometric({
-              variables: {
-                input: {
-                  enabled: true,
-                  publicKey: biometricKey,
-                },
-              },
-            });
-          } catch (error) {
-            console.error('Failed to update biometric setting on server:', error);
-          }
-          
-          Alert.alert(
-            'Success!',
-            `${biometricType} login has been enabled for your account.`
-          );
-        } else {
-          Alert.alert(
-            'Authentication Failed',
-            'Biometric authentication was not successful. You can enable it later from settings.'
-          );
-        }
-      } catch (error) {
-        console.error('Biometric authentication error:', error);
-        Alert.alert(
-          'Error',
-          'Failed to setup biometric authentication. Please try again later.'
-        );
-      }
+  // Timer for resend OTP
+  useEffect(() => {
+    if (timer > 0) {
+      const interval = setInterval(() => {
+        setTimer((prev) => prev - 1);
+      }, 1000);
+      return () => clearInterval(interval);
     } else {
-      setBiometricEnabled(false);
-      await AsyncStorage.removeItem(`biometric_key_${mobile}`);
+      setCanResend(true);
+    }
+  }, [timer]);
+
+  const handleSendOtp = async () => {
+    try {
+      await sendOtp({ variables: { mobile } });
+      Alert.alert('OTP Sent', 'Please check the backend console for your OTP code.');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to send OTP');
     }
   };
 
-  const handleContinue = async () => {
-    // If biometric not enabled, update backend with disabled state
-    if (!biometricEnabled) {
-      try {
-        await setupBiometric({
-          variables: {
-            input: {
-              enabled: false,
-              publicKey: '',
+  const handleOtpChange = (value: string, index: number) => {
+    // Only allow numbers
+    if (!/^\d*$/.test(value)) return;
+
+    const newOtp = [...otp];
+    newOtp[index] = value;
+    setOtp(newOtp);
+
+    // Auto-focus next input
+    if (value && index < 5) {
+      inputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleKeyPress = (e: any, index: number) => {
+    // Handle backspace
+    if (e.nativeEvent.key === 'Backspace' && !otp[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    const otpCode = otp.join('');
+    
+    if (otpCode.length !== 6) {
+      Alert.alert('Error', 'Please enter the complete 6-digit OTP');
+      return;
+    }
+
+    try {
+      // Step 1: Verify OTP (this creates the user with mobile only)
+      const { data } = await verifyOtp({
+        variables: { mobile, code: otpCode },
+      });
+
+      if (!data?.verifyOtp?.token || !data?.verifyOtp?.user?.id) {
+        throw new Error('Failed to verify OTP');
+      }
+
+      // Store token and basic user data
+      await AsyncStorage.setItem('token', data.verifyOtp.token);
+
+      // Step 2: Update user with complete profile data
+      await updateUser({
+        variables: {
+          input: {
+            userId: data.verifyOtp.user.id,
+            name,
+            email: email || undefined,
+            dateOfBirth: dob,
+            address,
+            city,
+            pinCode,
+          },
+        },
+      });
+
+      // Step 3: Set password
+      await updatePassword({
+        variables: {
+          mobile,
+          password,
+        },
+      });
+
+      // Update AsyncStorage with complete user data
+      const completeUser = {
+        ...data.verifyOtp.user,
+        name,
+        email: email || data.verifyOtp.user.email,
+      };
+      await AsyncStorage.setItem('user', JSON.stringify(completeUser));
+
+      Alert.alert(
+        'Success!', 
+        'Your account has been created successfully!',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Navigate to biometric setup
+              navigation.navigate('BiometricSetup', { mobile });
             },
           },
-        });
-      } catch (error) {
-        console.error('Failed to update biometric setting:', error);
-      }
+        ]
+      );
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Invalid OTP. Please try again.');
+      // Clear OTP fields
+      setOtp(['', '', '', '', '', '']);
+      inputRefs.current[0]?.focus();
     }
-
-    // Navigate to main app
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Home' }],
-    });
   };
 
-  const handleSkip = () => {
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Home' }],
-    });
+  const handleResendOtp = async () => {
+    try {
+      await sendOtp({ variables: { mobile } });
+      setTimer(60);
+      setCanResend(false);
+      setOtp(['', '', '', '', '', '']);
+      Alert.alert('Success', 'OTP has been resent to your mobile number.');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to resend OTP');
+    }
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
@@ -172,13 +188,18 @@ export default function SignupStep4Screen({ navigation, route }: SignupStep4Prop
           end={{ x: 1, y: 1 }}
           style={styles.header}
         >
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backButtonText}>← Back</Text>
+          </TouchableOpacity>
+
           <View style={styles.iconContainer}>
-            <Text style={styles.iconText}>
-              {biometricType === 'Face ID' ? '👤' : '👆'}
-            </Text>
+            <Text style={styles.iconText}>📱</Text>
           </View>
-          <Text style={styles.title}>Setup {biometricType || 'Biometric'}</Text>
-          <Text style={styles.subtitle}>Quick and secure access</Text>
+          <Text style={styles.title}>Verify Mobile</Text>
+          <Text style={styles.subtitle}>Enter the OTP sent to your phone</Text>
         </LinearGradient>
 
         {/* Form Card */}
@@ -194,113 +215,71 @@ export default function SignupStep4Screen({ navigation, route }: SignupStep4Prop
           </View>
 
           <Text style={styles.stepTitle}>Step 4 of 4</Text>
-          <Text style={styles.stepSubtitle}>Almost done! Setup biometric login</Text>
+          <Text style={styles.stepSubtitle}>Almost there! Verify your mobile</Text>
 
-          {biometricAvailable ? (
-            <>
-              {/* Biometric Toggle */}
-              <View style={styles.biometricCard}>
-                <View style={styles.biometricHeader}>
-                  <Text style={styles.biometricIcon}>
-                    {biometricType === 'Face ID' ? '👤' : '👆'}
-                  </Text>
-                  <View style={styles.biometricTextContainer}>
-                    <Text style={styles.biometricTitle}>
-                      Enable {biometricType} Login
-                    </Text>
-                    <Text style={styles.biometricSubtitle}>
-                      Login quickly and securely using your {biometricType.toLowerCase()}
-                    </Text>
-                  </View>
-                  <Switch
-                    value={biometricEnabled}
-                    onValueChange={handleEnableBiometric}
-                    trackColor={{ false: '#E5E7EB', true: '#667eea' }}
-                    thumbColor="#fff"
-                  />
-                </View>
-              </View>
+          {/* Mobile Display */}
+          <View style={styles.mobileDisplay}>
+            <Text style={styles.mobileLabel}>OTP sent to:</Text>
+            <Text style={styles.mobileNumber}>+91 {mobile}</Text>
+          </View>
 
-              {/* Benefits */}
-              <View style={styles.benefitsContainer}>
-                <Text style={styles.benefitsTitle}>Benefits:</Text>
-                <View style={styles.benefit}>
-                  <Text style={styles.benefitIcon}>✓</Text>
-                  <Text style={styles.benefitText}>
-                    Fast and convenient login
-                  </Text>
-                </View>
-                <View style={styles.benefit}>
-                  <Text style={styles.benefitIcon}>✓</Text>
-                  <Text style={styles.benefitText}>
-                    Secure authentication
-                  </Text>
-                </View>
-                <View style={styles.benefit}>
-                  <Text style={styles.benefitIcon}>✓</Text>
-                  <Text style={styles.benefitText}>
-                    No need to remember passwords
-                  </Text>
-                </View>
-                <View style={styles.benefit}>
-                  <Text style={styles.benefitIcon}>✓</Text>
-                  <Text style={styles.benefitText}>
-                    Can be disabled anytime from settings
-                  </Text>
-                </View>
-              </View>
+          {/* OTP Input */}
+          <View style={styles.otpContainer}>
+            {otp.map((digit, index) => (
+              <TextInput
+                key={index}
+                ref={(ref) => (inputRefs.current[index] = ref)}
+                style={styles.otpInput}
+                value={digit}
+                onChangeText={(value) => handleOtpChange(value, index)}
+                onKeyPress={(e) => handleKeyPress(e, index)}
+                keyboardType="number-pad"
+                maxLength={1}
+                autoFocus={index === 0}
+              />
+            ))}
+          </View>
 
-              {biometricEnabled && (
-                <View style={styles.successBanner}>
-                  <Text style={styles.successIcon}>✓</Text>
-                  <Text style={styles.successText}>
-                    {biometricType} login successfully enabled!
-                  </Text>
-                </View>
-              )}
-            </>
-          ) : (
-            <View style={styles.unavailableCard}>
-              <Text style={styles.unavailableIcon}>ℹ️</Text>
-              <Text style={styles.unavailableTitle}>
-                Biometric Not Available
+          <Text style={styles.otpHint}>
+            💡 Check the backend console for the OTP code
+          </Text>
+
+          {/* Timer / Resend */}
+          <View style={styles.resendContainer}>
+            {!canResend ? (
+              <Text style={styles.timerText}>
+                Resend OTP in {timer}s
               </Text>
-              <Text style={styles.unavailableText}>
-                Your device doesn't support biometric authentication or it's not setup.
-                You can enable it later from device settings and app profile.
-              </Text>
-            </View>
-          )}
+            ) : (
+              <TouchableOpacity
+                onPress={handleResendOtp}
+                disabled={sending}
+              >
+                <Text style={styles.resendButton}>
+                  {sending ? 'Sending...' : 'Resend OTP'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
 
-          {/* Action Buttons */}
+          {/* Verify Button */}
           <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleContinue}
-            disabled={loading}
+            style={[styles.button, (verifying || updatingUser || updatingPassword) && styles.buttonDisabled]}
+            onPress={handleVerifyOtp}
+            disabled={verifying || updatingUser || updatingPassword}
           >
-            {loading ? (
+            {(verifying || updatingUser || updatingPassword) ? (
               <ActivityIndicator color="#fff" />
             ) : (
               <>
-                <Text style={styles.buttonText}>
-                  {biometricEnabled ? 'Get Started' : 'Continue Without Biometric'}
-                </Text>
-                <Text style={styles.buttonIcon}>→</Text>
+                <Text style={styles.buttonText}>Complete Signup</Text>
+                <Text style={styles.buttonIcon}>✓</Text>
               </>
             )}
           </TouchableOpacity>
-
-          {biometricAvailable && !biometricEnabled && (
-            <TouchableOpacity
-              style={styles.skipButton}
-              onPress={handleSkip}
-            >
-              <Text style={styles.skipButtonText}>Skip for now</Text>
-            </TouchableOpacity>
-          )}
         </View>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -311,6 +290,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
+    paddingBottom: 40,
   },
   header: {
     paddingTop: 60,
@@ -319,6 +299,17 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
     alignItems: 'center',
+  },
+  backButton: {
+    position: 'absolute',
+    top: 60,
+    left: 24,
+    padding: 8,
+  },
+  backButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   iconContainer: {
     width: 80,
@@ -333,37 +324,37 @@ const styles = StyleSheet.create({
     fontSize: 40,
   },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#fff',
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: 'rgba(255, 255, 255, 0.9)',
   },
   formCard: {
-    margin: 24,
     marginTop: -20,
     backgroundColor: '#fff',
-    borderRadius: 20,
+    borderRadius: 24,
     padding: 24,
+    marginHorizontal: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
-    elevation: 8,
+    elevation: 4,
   },
   progressIndicator: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 24,
   },
   progressDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     backgroundColor: '#E5E7EB',
   },
   progressDotActive: {
@@ -388,103 +379,60 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginBottom: 24,
   },
-  biometricCard: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-  },
-  biometricHeader: {
+  mobileDisplay: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  biometricIcon: {
-    fontSize: 40,
-    marginRight: 16,
-  },
-  biometricTextContainer: {
-    flex: 1,
-  },
-  biometricTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  biometricSubtitle: {
-    fontSize: 13,
-    color: '#6B7280',
-    lineHeight: 18,
-  },
-  benefitsContainer: {
     backgroundColor: '#F3F4F6',
     padding: 16,
     borderRadius: 12,
-    marginBottom: 20,
+    marginBottom: 24,
   },
-  benefitsTitle: {
+  mobileLabel: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 12,
-  },
-  benefit: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  benefitIcon: {
-    fontSize: 16,
-    color: '#10B981',
+    color: '#6B7280',
     marginRight: 8,
   },
-  benefitText: {
-    fontSize: 13,
-    color: '#6B7280',
-  },
-  successBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#D1FAE5',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 20,
-  },
-  successIcon: {
-    fontSize: 20,
-    color: '#10B981',
-    marginRight: 12,
-  },
-  successText: {
-    fontSize: 14,
+  mobileNumber: {
+    fontSize: 16,
     fontWeight: '600',
-    color: '#059669',
-    flex: 1,
+    color: '#1F2937',
   },
-  unavailableCard: {
-    alignItems: 'center',
-    padding: 24,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 16,
-    marginBottom: 24,
-  },
-  unavailableIcon: {
-    fontSize: 48,
+  otpContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 16,
   },
-  unavailableTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#374151',
-    marginBottom: 8,
+  otpInput: {
+    width: 48,
+    height: 56,
+    borderWidth: 2,
+    borderColor: '#667eea',
+    borderRadius: 12,
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    color: '#1F2937',
+    backgroundColor: '#F9FAFB',
   },
-  unavailableText: {
-    fontSize: 14,
+  otpHint: {
+    fontSize: 12,
     color: '#6B7280',
     textAlign: 'center',
-    lineHeight: 20,
+    marginBottom: 16,
+    fontStyle: 'italic',
+  },
+  resendContainer: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  timerText: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  resendButton: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#667eea',
   },
   button: {
     backgroundColor: '#667eea',
@@ -512,14 +460,5 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
-  },
-  skipButton: {
-    padding: 16,
-    alignItems: 'center',
-  },
-  skipButtonText: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '600',
   },
 });
