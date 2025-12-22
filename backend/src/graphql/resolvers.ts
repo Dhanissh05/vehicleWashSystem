@@ -519,6 +519,11 @@ export const resolvers = {
         where: { mobile },
       });
 
+      // Check if user exists and is a worker or admin
+      if (user && (user.role === UserRole.WORKER || user.role === UserRole.ADMIN)) {
+        throw new Error('This mobile number is registered as staff. Please use the company app to login with your credentials.');
+      }
+
       if (!user) {
         user = await context.prisma.user.create({
           data: {
@@ -547,6 +552,11 @@ export const resolvers = {
 
       if (!user || !user.password) {
         throw new Error('Invalid credentials');
+      }
+
+      // Only allow admin and worker roles to login with password
+      if (user.role === UserRole.CUSTOMER) {
+        throw new Error('Customer accounts cannot login here. Please use the customer app with OTP.');
       }
 
       const isValid = await bcrypt.compare(password, user.password);
