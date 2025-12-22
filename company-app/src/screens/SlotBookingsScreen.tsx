@@ -14,6 +14,18 @@ import {
 } from 'react-native';
 import { useQuery, useMutation, gql } from '@apollo/client';
 
+const GET_CENTER = gql`
+  query GetCenter {
+    centers {
+      id
+      dailySlotsTwoWheeler
+      availableSlotsTwoWheeler
+      dailySlotsCar
+      availableSlotsCar
+    }
+  }
+`;
+
 const SLOT_BOOKINGS = gql`
   query SlotBookings($status: SlotBookingStatus) {
     slotBookings(status: $status) {
@@ -97,6 +109,8 @@ export default function SlotBookingsScreen({ navigation }: any) {
   });
 
   const [verifyBooking, { loading: verifying }] = useMutation(VERIFY_SLOT_BOOKING, {
+    refetchQueries: [{ query: GET_CENTER }],
+    awaitRefetchQueries: true,
     onCompleted: () => {
       Alert.alert('Success', 'Booking verified and vehicle added');
       setShowVerifyModal(false);
@@ -110,6 +124,8 @@ export default function SlotBookingsScreen({ navigation }: any) {
   });
 
   const [cancelBooking] = useMutation(CANCEL_SLOT_BOOKING, {
+    refetchQueries: [{ query: GET_CENTER }],
+    awaitRefetchQueries: true,
     onCompleted: () => {
       Alert.alert('Success', 'Booking cancelled');
       refetch();

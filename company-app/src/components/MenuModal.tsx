@@ -8,7 +8,9 @@ import {
   Animated,
   Image,
   ScrollView,
+  Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, gql } from '@apollo/client';
 import CalendarIcon from './CalendarIcon';
@@ -37,13 +39,16 @@ interface MenuModalProps {
 export default function MenuModal({ visible, onClose, navigation }: MenuModalProps) {
   const [userName, setUserName] = useState('User');
   const [userRole, setUserRole] = useState('');
+  const [loadingUser, setLoadingUser] = useState(true);
   const slideAnim = useRef(new Animated.Value(0)).current;
   const { data, refetch } = useQuery(GET_CENTER);
+  const insets = useSafeAreaInsets();
   
   const center = data?.centers?.[0];
 
   useEffect(() => {
     if (visible) {
+      console.log('📂 MenuModal - Opening drawer menu');
       loadUserData();
       refetch(); // Refetch to get latest user data including photo
     }
@@ -67,14 +72,19 @@ export default function MenuModal({ visible, onClose, navigation }: MenuModalPro
 
   const loadUserData = async () => {
     try {
+      setLoadingUser(true);
       const userJson = await AsyncStorage.getItem('user');
       if (userJson) {
         const user = JSON.parse(userJson);
         setUserName(user.name || user.mobile);
         setUserRole(user.role);
+        console.log('🔍 MenuModal - User Role:', user.role);
+        console.log('🔍 MenuModal - User Name:', user.name);
       }
     } catch (error) {
       console.error('Failed to load user data:', error);
+    } finally {
+      setLoadingUser(false);
     }
   };
 
@@ -135,7 +145,15 @@ export default function MenuModal({ visible, onClose, navigation }: MenuModalPro
           </View>
 
           {/* Menu Items */}
-          <ScrollView style={styles.menuSection} showsVerticalScrollIndicator={false}>
+          <ScrollView 
+            style={styles.menuSection} 
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 20 }}
+            onScroll={(event) => {
+              console.log('📜 ScrollView scroll position:', event.nativeEvent.contentOffset.y);
+            }}
+            scrollEventThrottle={400}
+          >
             <TouchableOpacity
               style={styles.menuItem}
               onPress={() => handleNavigate('Dashboard')}
@@ -179,13 +197,34 @@ export default function MenuModal({ visible, onClose, navigation }: MenuModalPro
             </TouchableOpacity>
 
             {userRole === 'WORKER' && (
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => handleNavigate('WorkerProfile')}
-              >
-                <Text style={styles.menuIcon}>👤</Text>
-                <Text style={styles.menuText}>My Profile</Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => handleNavigate('WorkerProfile')}
+                >
+                  <Text style={styles.menuIcon}>👤</Text>
+                  <Text style={styles.menuText}>My Profile</Text>
+                </TouchableOpacity>
+
+                {/* LOGOUT FOR WORKER */}
+                <TouchableOpacity
+                  style={[styles.menuItem, { 
+                    borderTopWidth: 2, 
+                    borderTopColor: '#EF4444', 
+                    marginTop: 20, 
+                    paddingTop: 20,
+                    backgroundColor: '#FEE2E2',
+                    paddingBottom: 40
+                  }]}
+                  onPress={() => {
+                    console.log('🚪 LOGOUT BUTTON PRESSED (WORKER)!');
+                    handleLogout();
+                  }}
+                >
+                  <Text style={styles.menuIcon}>🚪</Text>
+                  <Text style={[styles.menuText, { color: '#EF4444', fontWeight: '700', fontSize: 18 }]}>LOGOUT</Text>
+                </TouchableOpacity>
+              </>
             )}
 
             {userRole === 'ADMIN' && (
@@ -229,17 +268,28 @@ export default function MenuModal({ visible, onClose, navigation }: MenuModalPro
                   <Text style={styles.menuIcon}>⚙️</Text>
                   <Text style={styles.menuText}>Settings</Text>
                 </TouchableOpacity>
+
+                {/* LOGOUT FOR ADMIN */}
+                <TouchableOpacity
+                  style={[styles.menuItem, { 
+                    borderTopWidth: 2, 
+                    borderTopColor: '#EF4444', 
+                    marginTop: 20, 
+                    paddingTop: 20,
+                    backgroundColor: '#FEE2E2',
+                    paddingBottom: 40
+                  }]}
+                  onPress={() => {
+                    console.log('🚪 LOGOUT BUTTON PRESSED (ADMIN)!');
+                    handleLogout();
+                  }}
+                >
+                  <Text style={styles.menuIcon}>🚪</Text>
+                  <Text style={[styles.menuText, { color: '#EF4444', fontWeight: '700', fontSize: 18 }]}>LOGOUT</Text>
+                </TouchableOpacity>
               </>
             )}
           </ScrollView>
-
-          {/* Footer with Logout */}
-          <View style={styles.footer}>
-            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-              <Text style={styles.logoutIcon}>🚪</Text>
-              <Text style={styles.logoutText}>Logout</Text>
-            </TouchableOpacity>
-          </View>
         </Animated.View>
       </TouchableOpacity>
     </Modal>
@@ -315,12 +365,21 @@ const styles = StyleSheet.create({
     color: '#374151',
     fontWeight: '500',
   },
+  logoutSection: {
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    marginTop: 20,
+    paddingTop: 16,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
   footer: {
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 40,
+    paddingBottom: 30,
+    backgroundColor: '#fff',
   },
   logoutButton: {
     flexDirection: 'row',

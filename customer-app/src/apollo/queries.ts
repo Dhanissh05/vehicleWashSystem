@@ -139,6 +139,7 @@ export const MY_VEHICLES = gql`
       model
       brand
       color
+      photoUrl
       serviceType
       status
       createdAt

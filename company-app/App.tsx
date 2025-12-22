@@ -6,6 +6,7 @@ import { ApolloProvider, ApolloClient, InMemoryCache, createHttpLink } from '@ap
 import { setContext } from '@apollo/client/link/context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useVersionChecker } from './src/hooks/useVersionChecker';
+import UpdateChecker from './src/components/UpdateChecker';
 
 // Screens
 import LoginScreen from './src/screens/LoginScreen';
@@ -87,6 +88,7 @@ export default function App() {
   return (
     <ApolloProvider client={apolloClient}>
       <AppNavigator />
+      <UpdateChecker />
     </ApolloProvider>
   );
 }

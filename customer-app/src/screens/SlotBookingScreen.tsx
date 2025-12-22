@@ -47,6 +47,11 @@ const SlotBookingScreen = ({ navigation }: any) => {
     fetchPolicy: 'cache-and-network',
   });
   const [createBooking, { loading }] = useMutation(CREATE_SLOT_BOOKING, {
+    refetchQueries: [
+      { query: CENTERS },
+      { query: MY_SLOT_BOOKINGS }
+    ],
+    awaitRefetchQueries: true,
     onError: (error) => {
       Alert.alert('Booking Error', error.message || 'Failed to create booking');
     },
@@ -67,6 +72,28 @@ const SlotBookingScreen = ({ navigation }: any) => {
       console.log('SlotBookingScreen unmounted');
     };
   }, []);
+
+  // Auto-fetch vehicle details when vehicle number is typed
+  useEffect(() => {
+    if (vehicleNumber && vehicleNumber.length >= 4 && vehiclesData?.myVehicles) {
+      const matchedVehicle = vehiclesData.myVehicles.find(
+        (v: any) => v.vehicleNumber.toUpperCase() === vehicleNumber.toUpperCase()
+      );
+      
+      if (matchedVehicle) {
+        // Auto-fill vehicle details
+        setSelectedVehicleId(matchedVehicle.id);
+        setVehicleType(matchedVehicle.vehicleType);
+        setCarCategory(matchedVehicle.carCategory || 'SEDAN');
+        setBrand(matchedVehicle.brand || '');
+        setModel(matchedVehicle.model || '');
+        setColor(matchedVehicle.color || '');
+        setPhotoUrl(matchedVehicle.photoUrl || null);
+        
+        console.log(`[Auto-fetch] Vehicle details loaded for ${vehicleNumber}`);
+      }
+    }
+  }, [vehicleNumber, vehiclesData]);
 
   const loadUserData = async () => {
     try {
@@ -100,6 +127,7 @@ const SlotBookingScreen = ({ navigation }: any) => {
   const handleNewVehicle = () => {
     setSelectedVehicleId(null);
     setVehicleNumber('');
+    setVehicleType('CAR');
     setCarCategory('SEDAN');
     setBrand('');
     setModel('');
@@ -736,6 +764,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     borderWidth: 1,
     borderColor: '#E0E0E0',
+    color: '#1F2937',
   },
   photoButton: {
     backgroundColor: '#FFF',

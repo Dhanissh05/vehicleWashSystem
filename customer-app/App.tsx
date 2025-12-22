@@ -9,6 +9,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import { apolloClient } from './src/apollo/client';
 import { useVersionChecker } from './src/hooks/useVersionChecker';
 import { usePushNotifications } from './src/hooks/usePushNotifications';
+import UpdateChecker from './src/components/UpdateChecker';
 
 // Screens
 import LandingScreen from './src/screens/LandingScreen';
@@ -199,6 +200,7 @@ export default function App() {
   return (
     <ApolloProvider client={apolloClient}>
       <AppNavigator />
+      <UpdateChecker />
     </ApolloProvider>
   );
 }
