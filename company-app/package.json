@@ -19,6 +19,8 @@
     "expo-build-properties": "^1.0.10",
     "expo-camera": "~17.0.1",
     "expo-image-picker": "~17.0.1",
+    "expo-linear-gradient": "~14.0.2",
+    "expo-local-authentication": "~15.0.0",
     "expo-notifications": "^0.32.15",
     "expo-print": "^15.0.7",
     "expo-sharing": "^14.0.7",

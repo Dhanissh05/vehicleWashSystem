@@ -59,9 +59,30 @@ export default function LoginScreen({ navigation }: any) {
 
     try {
       const { data } = await login({ variables: { mobile, password } });
+      
+      // Check if user is a customer
+      if (data.login.user.role === 'CUSTOMER') {
+        Alert.alert(
+          'Wrong App',
+          'You are registered as a customer. Please use the Customer App with OTP to login.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
       await AsyncStorage.setItem('token', data.login.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.login.user));
-      navigation.replace('Dashboard');
+      
+      // Check if passcode is enabled
+      const passcodeEnabled = await AsyncStorage.getItem('passcode_enabled');
+      
+      if (passcodeEnabled === 'true') {
+        // Passcode already set, go to dashboard
+        navigation.replace('Dashboard');
+      } else {
+        // First time login, setup passcode
+        navigation.replace('PasscodeSetup');
+      }
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Invalid credentials');
     }

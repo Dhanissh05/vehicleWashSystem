@@ -11,6 +11,8 @@ import UpdateChecker from './src/components/UpdateChecker';
 // Screens
 import LoginScreen from './src/screens/LoginScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
+import PasscodeSetupScreen from './src/screens/PasscodeSetupScreen';
+import PasscodeLoginScreen from './src/screens/PasscodeLoginScreen';
 import AddVehicleScreen from './src/screens/AddVehicleScreen';
 import WashCycleScreen from './src/screens/WashCycleScreen';
 import BodyRepairCycleScreen from './src/screens/BodyRepairCycleScreen';
@@ -60,13 +62,46 @@ const apolloClient = new ApolloClient({
 });
 
 function AppNavigator() {
+  const [initialRoute, setInitialRoute] = React.useState<string | null>(null);
+
   // Check for version updates on app start
   useVersionChecker();
 
+  React.useEffect(() => {
+    checkAuthState();
+  }, []);
+
+  const checkAuthState = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const passcodeEnabled = await AsyncStorage.getItem('passcode_enabled');
+      
+      if (token && passcodeEnabled === 'true') {
+        // User is logged in and has passcode set
+        setInitialRoute('PasscodeLogin');
+      } else {
+        // User needs to login
+        setInitialRoute('Login');
+      }
+    } catch (error) {
+      console.error('Error checking auth state:', error);
+      setInitialRoute('Login');
+    }
+  };
+
+  if (!initialRoute) {
+    return null; // Or a loading screen
+  }
+
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: true }}>
+      <Stack.Navigator 
+        initialRouteName={initialRoute}
+        screenOptions={{ headerShown: true }}
+      >
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="PasscodeSetup" component={PasscodeSetupScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="PasscodeLogin" component={PasscodeLoginScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Dashboard" component={DashboardScreen} />
         <Stack.Screen name="AddVehicle" component={AddVehicleScreen} options={{ title: 'Entry Vehicle' }} />
         <Stack.Screen name="WashCycle" component={WashCycleScreen} options={{ headerShown: false }} />

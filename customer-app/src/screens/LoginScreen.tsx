@@ -62,6 +62,16 @@ export default function LoginScreen({ navigation }: any) {
       const { data } = await login({ variables: { mobile, password } });
       
       if (data?.login?.token) {
+        // Check if user is a worker or admin
+        if (data.login.user.role === 'WORKER' || data.login.user.role === 'ADMIN') {
+          Alert.alert(
+            'Wrong App',
+            'You are registered as staff. Please use the Company App to login.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+
         await AsyncStorage.setItem('token', data.login.token);
         await AsyncStorage.setItem('user', JSON.stringify(data.login.user));
         navigation.replace('Home');

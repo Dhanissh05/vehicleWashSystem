@@ -544,7 +544,7 @@ export const resolvers = {
       return { token, user };
     },
 
-    // Login with password (for admin/worker)
+    // Login with password (for admin/worker and customers with password)
     login: async (_: any, { mobile, password }: any, context: Context) => {
       const user = await context.prisma.user.findUnique({
         where: { mobile },
@@ -552,11 +552,6 @@ export const resolvers = {
 
       if (!user || !user.password) {
         throw new Error('Invalid credentials');
-      }
-
-      // Only allow admin and worker roles to login with password
-      if (user.role === UserRole.CUSTOMER) {
-        throw new Error('Customer accounts cannot login here. Please use the customer app with OTP.');
       }
 
       const isValid = await bcrypt.compare(password, user.password);
