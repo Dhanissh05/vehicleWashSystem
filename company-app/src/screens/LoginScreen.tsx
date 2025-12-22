@@ -73,15 +73,26 @@ export default function LoginScreen({ navigation }: any) {
       await AsyncStorage.setItem('token', data.login.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.login.user));
       
-      // Check if passcode is enabled
+      // Check if passcode is already setup
+      const passcode = await AsyncStorage.getItem('app_passcode');
       const passcodeEnabled = await AsyncStorage.getItem('passcode_enabled');
       
-      if (passcodeEnabled === 'true') {
-        // Passcode already set, go to dashboard
+      console.log('[Login] User:', data.login.user.name, 'Role:', data.login.user.role);
+      console.log('[Login] Passcode exists:', passcode ? 'YES' : 'NO');
+      console.log('[Login] Passcode Enabled flag:', passcodeEnabled);
+      
+      // If no passcode exists, force setup
+      if (!passcode) {
+        console.log('[Login] No passcode found, navigating to PasscodeSetup');
+        navigation.replace('PasscodeSetup');
+      } else if (passcodeEnabled === 'true') {
+        // Passcode exists and enabled, go to dashboard
+        console.log('[Login] Passcode enabled, navigating to Dashboard');
         navigation.replace('Dashboard');
       } else {
-        // First time login, setup passcode
-        navigation.replace('PasscodeSetup');
+        // Passcode exists but disabled (user skipped on previous setup)
+        console.log('[Login] Passcode skipped previously, navigating to Dashboard');
+        navigation.replace('Dashboard');
       }
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Invalid credentials');

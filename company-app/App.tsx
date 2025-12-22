@@ -5,6 +5,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { ApolloProvider, ApolloClient, InMemoryCache, createHttpLink } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ActivityIndicator, View } from 'react-native';
 import { useVersionChecker } from './src/hooks/useVersionChecker';
 import UpdateChecker from './src/components/UpdateChecker';
 
@@ -74,13 +75,28 @@ function AppNavigator() {
   const checkAuthState = async () => {
     try {
       const token = await AsyncStorage.getItem('token');
+      const passcode = await AsyncStorage.getItem('app_passcode');
       const passcodeEnabled = await AsyncStorage.getItem('passcode_enabled');
       
-      if (token && passcodeEnabled === 'true') {
+      console.log('[Auth Check] Token:', token ? 'exists' : 'none');
+      console.log('[Auth Check] Passcode exists:', passcode ? 'YES' : 'NO');
+      console.log('[Auth Check] Passcode Enabled flag:', passcodeEnabled);
+      
+      if (token && passcode && passcodeEnabled === 'true') {
         // User is logged in and has passcode set
+        console.log('[Auth Check] Navigating to PasscodeLogin');
         setInitialRoute('PasscodeLogin');
+      } else if (token && !passcode && passcodeEnabled !== 'false') {
+        // User logged in but no passcode setup yet - force setup
+        console.log('[Auth Check] No passcode found, forcing PasscodeSetup');
+        setInitialRoute('PasscodeSetup');
+      } else if (token) {
+        // User logged in and skipped passcode
+        console.log('[Auth Check] Navigating to Dashboard (passcode skipped)');
+        setInitialRoute('Dashboard');
       } else {
         // User needs to login
+        console.log('[Auth Check] No auth, navigating to Login');
         setInitialRoute('Login');
       }
     } catch (error) {
@@ -90,7 +106,11 @@ function AppNavigator() {
   };
 
   if (!initialRoute) {
-    return null; // Or a loading screen
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#8B5CF6" />
+      </View>
+    );
   }
 
   return (
