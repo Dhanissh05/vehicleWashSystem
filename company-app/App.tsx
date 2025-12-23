@@ -5,15 +5,15 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { ApolloProvider, ApolloClient, InMemoryCache, createHttpLink } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { useVersionChecker } from './src/hooks/useVersionChecker';
 import UpdateChecker from './src/components/UpdateChecker';
 
 // Screens
 import LoginScreen from './src/screens/LoginScreen';
-import DashboardScreen from './src/screens/DashboardScreen';
 import PasscodeSetupScreen from './src/screens/PasscodeSetupScreen';
-import PasscodeLoginScreen from './src/screens/PasscodeLoginScreen';
+import PasscodeUnlockScreen from './src/screens/PasscodeUnlockScreen';
+import DashboardScreen from './src/screens/DashboardScreen';
 import AddVehicleScreen from './src/screens/AddVehicleScreen';
 import WashCycleScreen from './src/screens/WashCycleScreen';
 import BodyRepairCycleScreen from './src/screens/BodyRepairCycleScreen';
@@ -65,7 +65,6 @@ const apolloClient = new ApolloClient({
 function AppNavigator() {
   const [initialRoute, setInitialRoute] = React.useState<string | null>(null);
 
-  // Check for version updates on app start
   useVersionChecker();
 
   React.useEffect(() => {
@@ -74,34 +73,55 @@ function AppNavigator() {
 
   const checkAuthState = async () => {
     try {
-      const token = await AsyncStorage.getItem('token');
-      const passcode = await AsyncStorage.getItem('app_passcode');
-      const passcodeEnabled = await AsyncStorage.getItem('passcode_enabled');
+      const isLoggedIn = await AsyncStorage.getItem('isLoggedIn');
+      const isPasscodeSetup = await AsyncStorage.getItem('isPasscodeSetup');
       
-      console.log('[Auth Check] Token:', token ? 'exists' : 'none');
-      console.log('[Auth Check] Passcode exists:', passcode ? 'YES' : 'NO');
-      console.log('[Auth Check] Passcode Enabled flag:', passcodeEnabled);
+      console.log('[Auth Check] isLoggedIn:', isLoggedIn);
+      console.log('[Auth Check] isPasscodeSetup:', isPasscodeSetup);
       
-      if (token && passcode && passcodeEnabled === 'true') {
-        // User is logged in and has passcode set
-        console.log('[Auth Check] Navigating to PasscodeLogin');
-        setInitialRoute('PasscodeLogin');
-      } else if (token && !passcode && passcodeEnabled !== 'false') {
-        // User logged in but no passcode setup yet - force setup
-        console.log('[Auth Check] No passcode found, forcing PasscodeSetup');
+      if (isLoggedIn === 'true' && isPasscodeSetup === 'true') {
+        setInitialRoute('PasscodeUnlock');
+      } else if (isLoggedIn === 'true' && isPasscodeSetup !== 'true') {
         setInitialRoute('PasscodeSetup');
-      } else if (token) {
-        // User logged in and skipped passcode
-        console.log('[Auth Check] Navigating to Dashboard (passcode skipped)');
-        setInitialRoute('Dashboard');
       } else {
-        // User needs to login
-        console.log('[Auth Check] No auth, navigating to Login');
         setInitialRoute('Login');
       }
     } catch (error) {
       console.error('Error checking auth state:', error);
       setInitialRoute('Login');
+    }
+  };
+
+  const handlePasscodeSubmit = async () => {
+    const storedPasscode = await AsyncStorage.getItem('app_passcode');
+    
+    if (passcodeInput === storedPasscode) {
+      console.log('[Passcode] Verified successfully');
+      setPasscodeModalVisible(false);
+    } else {
+      const newAttempts = attempts + 1;
+      setAttempts(newAttempts);
+      
+      if (newAttempts >= maxAttempts) {
+        Alert.alert(
+          'Too Many Attempts',
+          'You will be logged out for security.',
+          [
+            {
+              text: 'OK',
+              onPress: async () => {
+                await AsyncStorage.removeItem('token');
+                await AsyncStorage.removeItem('user');
+                setPasscodeModalVisible(false);
+                setInitialRoute('Login');
+              },
+            },
+          ]
+        );
+      } else {
+        setPasscodeInput('');
+        Alert.alert('Incorrect Passcode', `${maxAttempts - newAttempts} attempts remaining`);
+      }
     }
   };
 
@@ -121,7 +141,7 @@ function AppNavigator() {
       >
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
         <Stack.Screen name="PasscodeSetup" component={PasscodeSetupScreen} options={{ headerShown: false }} />
-        <Stack.Screen name="PasscodeLogin" component={PasscodeLoginScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="PasscodeUnlock" component={PasscodeUnlockScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Dashboard" component={DashboardScreen} />
         <Stack.Screen name="AddVehicle" component={AddVehicleScreen} options={{ title: 'Entry Vehicle' }} />
         <Stack.Screen name="WashCycle" component={WashCycleScreen} options={{ headerShown: false }} />
@@ -138,7 +158,6 @@ function AppNavigator() {
     </NavigationContainer>
   );
 }
-
 export default function App() {
   return (
     <ApolloProvider client={apolloClient}>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ActivityIndicator } from 'react-native';
 import * as Updates from 'expo-updates';
 
 export default function UpdateChecker() {
@@ -19,10 +19,7 @@ export default function UpdateChecker() {
       const update = await Updates.checkForUpdateAsync();
       
       if (update.isAvailable) {
-        console.log('Update available! Auto-downloading...');
         setUpdateAvailable(true);
-        // Automatically download and apply update
-        await downloadAndApplyUpdate();
       }
     } catch (error) {
       console.error('Error checking for updates:', error);
@@ -34,56 +31,132 @@ export default function UpdateChecker() {
   const downloadAndApplyUpdate = async () => {
     try {
       setIsDownloading(true);
-      console.log('Fetching update...');
       await Updates.fetchUpdateAsync();
       
-      console.log('Update downloaded! Reloading app...');
-      // Automatically reload without showing alert
+      // Show success message and reload
+      alert('Update downloaded successfully! App will restart now.');
       await Updates.reloadAsync();
     } catch (error) {
       console.error('Error downloading update:', error);
-      // Silently fail - user can continue using current version
+      alert('Failed to download update. Please try again later.');
       setIsDownloading(false);
-      setUpdateAvailable(false);
     }
   };
 
-  if (!updateAvailable || isDownloading) {
-    return (
-      <View style={styles.updateIndicator}>
-        {isDownloading && (
-          <>
-            <ActivityIndicator size="small" color="#8B5CF6" />
-            <Text style={styles.updateText}>Updating...</Text>
-          </>
-        )}
-      </View>
-    );
-  }
+  if (!updateAvailable) return null;
 
-  return null;
+  return (
+    <Modal
+      visible={updateAvailable}
+      transparent
+      animationType="fade"
+    >
+      <View style={styles.overlay}>
+        <View style={styles.modal}>
+          <Text style={styles.title}>🎉 Update Available</Text>
+          <Text style={styles.message}>
+            A new version of the app is available. Update now to get the latest features and improvements.
+          </Text>
+          
+          {isDownloading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#8B5CF6" />
+              <Text style={styles.loadingText}>Downloading update...</Text>
+            </View>
+          ) : (
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity
+                style={styles.laterButton}
+                onPress={() => setUpdateAvailable(false)}
+              >
+                <Text style={styles.laterText}>Later</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.updateButton}
+                onPress={downloadAndApplyUpdate}
+              >
+                <Text style={styles.updateText}>Update Now</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
 }
 
 const styles = StyleSheet.create({
-  updateIndicator: {
-    position: 'absolute',
-    top: 40,
-    right: 20,
-    flexDirection: 'row',
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#8B5CF6',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 8,
+    padding: 20,
+  },
+  modal: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
-    shadowRadius: 4,
+    shadowRadius: 8,
     elevation: 5,
   },
+  title: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  message: {
+    fontSize: 16,
+    color: '#6B7280',
+    marginBottom: 24,
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  laterButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+  },
+  laterText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  updateButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    backgroundColor: '#8B5CF6',
+    alignItems: 'center',
+  },
   updateText: {
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: '600',
     color: '#fff',
   },

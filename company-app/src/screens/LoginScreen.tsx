@@ -60,7 +60,6 @@ export default function LoginScreen({ navigation }: any) {
     try {
       const { data } = await login({ variables: { mobile, password } });
       
-      // Check if user is a customer
       if (data.login.user.role === 'CUSTOMER') {
         Alert.alert(
           'Wrong App',
@@ -72,27 +71,14 @@ export default function LoginScreen({ navigation }: any) {
 
       await AsyncStorage.setItem('token', data.login.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.login.user));
+      await AsyncStorage.setItem('isLoggedIn', 'true');
       
-      // Check if passcode is already setup
-      const passcode = await AsyncStorage.getItem('app_passcode');
-      const passcodeEnabled = await AsyncStorage.getItem('passcode_enabled');
+      const isPasscodeSetup = await AsyncStorage.getItem('isPasscodeSetup');
       
-      console.log('[Login] User:', data.login.user.name, 'Role:', data.login.user.role);
-      console.log('[Login] Passcode exists:', passcode ? 'YES' : 'NO');
-      console.log('[Login] Passcode Enabled flag:', passcodeEnabled);
-      
-      // If no passcode exists, force setup
-      if (!passcode) {
-        console.log('[Login] No passcode found, navigating to PasscodeSetup');
-        navigation.replace('PasscodeSetup');
-      } else if (passcodeEnabled === 'true') {
-        // Passcode exists and enabled, go to dashboard
-        console.log('[Login] Passcode enabled, navigating to Dashboard');
-        navigation.replace('Dashboard');
+      if (isPasscodeSetup === 'true') {
+        navigation.replace('PasscodeUnlock');
       } else {
-        // Passcode exists but disabled (user skipped on previous setup)
-        console.log('[Login] Passcode skipped previously, navigating to Dashboard');
-        navigation.replace('Dashboard');
+        navigation.replace('PasscodeSetup');
       }
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Invalid credentials');

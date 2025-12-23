@@ -16,6 +16,7 @@ import { useQuery, useMutation } from '@apollo/client';
 import { gql } from '@apollo/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
+import * as Updates from 'expo-updates';
 
 const GET_CENTER = gql`
   query GetCenter {
@@ -418,6 +419,7 @@ export default function SettingsScreen({ navigation }: any) {
           text: 'Logout',
           style: 'destructive',
           onPress: async () => {
+            await AsyncStorage.removeItem('isLoggedIn');
             await AsyncStorage.removeItem('token');
             await AsyncStorage.removeItem('user');
             navigation.reset({
@@ -428,6 +430,36 @@ export default function SettingsScreen({ navigation }: any) {
         },
       ]
     );
+  };
+
+  const checkForUpdates = async () => {
+    try {
+      if (!Updates.isEnabled) {
+        Alert.alert('Updates Disabled', 'Updates are not available in development mode');
+        return;
+      }
+      
+      const update = await Updates.checkForUpdateAsync();
+      if (update.isAvailable) {
+        Alert.alert('Update Available', 'Downloading latest version...', [{ text: 'OK' }]);
+        await Updates.fetchUpdateAsync();
+        Alert.alert(
+          'Update Ready',
+          'App will restart to apply the update',
+          [
+            {
+              text: 'Restart Now',
+              onPress: () => Updates.reloadAsync(),
+            },
+          ]
+        );
+      } else {
+        Alert.alert('No Updates', 'You are running the latest version');
+      }
+    } catch (error: any) {
+      console.error('Update check error:', error);
+      Alert.alert('Update Error', error?.message || 'Failed to check for updates');
+    }
   };
 
   return (
@@ -552,8 +584,8 @@ export default function SettingsScreen({ navigation }: any) {
 
           {/* Account Actions */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Account</Text>
-            
+            <Text style={styles.sectionTitle}>Security & Account</Text>
+
             <TouchableOpacity
               style={styles.actionButton}
               onPress={handleLogout}
@@ -567,6 +599,16 @@ export default function SettingsScreen({ navigation }: any) {
           {/* App Info */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>About</Text>
+            
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={checkForUpdates}
+            >
+              <Text style={styles.actionIcon}>🔄</Text>
+              <Text style={styles.actionText}>Check for Updates</Text>
+              <Text style={styles.actionArrow}>›</Text>
+            </TouchableOpacity>
+
             <View style={styles.infoCard}>
               <Text style={styles.appVersion}>Vehicle Wash System v1.0.0</Text>
               <Text style={styles.appCopyright}>© 2025 All Rights Reserved</Text>

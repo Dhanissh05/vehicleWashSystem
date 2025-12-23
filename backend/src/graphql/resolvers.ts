@@ -873,6 +873,24 @@ export const resolvers = {
       
       const isStaff = context.user!.role === UserRole.ADMIN || context.user!.role === UserRole.WORKER;
       
+      // Check if vehicle has an active slot booking
+      if (isStaff) {
+        const activeSlotBooking = await context.prisma.slotBooking.findFirst({
+          where: {
+            vehicleNumber: input.vehicleNumber,
+            status: {
+              in: ['PENDING', 'VERIFIED']
+            }
+          }
+        });
+
+        if (activeSlotBooking) {
+          throw new Error(
+            `Cannot add vehicle entry. This vehicle (${input.vehicleNumber}) has an active slot booking (Status: ${activeSlotBooking.status}). Please wait for the customer to arrive or cancel the booking first.`
+          );
+        }
+      }
+      
       // Check if vehicle already exists with active status
       const existingVehicle = await context.prisma.vehicle.findFirst({
         where: { 
