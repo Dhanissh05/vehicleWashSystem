@@ -139,6 +139,7 @@ export default function LoginScreen({ navigation }: any) {
             <TextInput
               style={styles.input}
               placeholder="Enter your mobile number"
+              placeholderTextColor="#9CA3AF"
               keyboardType="phone-pad"
               maxLength={10}
               value={mobile}
@@ -149,6 +150,7 @@ export default function LoginScreen({ navigation }: any) {
             <TextInput
               style={styles.input}
               placeholder="Enter your password"
+              placeholderTextColor="#9CA3AF"
               secureTextEntry
               value={password}
               onChangeText={setPassword}
@@ -276,6 +278,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
+    color: '#1F2937',
     marginBottom: 16,
     backgroundColor: '#F9FAFB',
   },

@@ -391,7 +391,10 @@ export const resolvers = {
 
       return await context.prisma.slotBooking.findMany({
         where,
-        include: { center: true },
+        include: { 
+          center: true,
+          services: true,
+        },
         orderBy: { createdAt: 'desc' },
       });
     },
@@ -401,7 +404,10 @@ export const resolvers = {
 
       return await context.prisma.slotBooking.findMany({
         where: { customerMobile: context.user!.mobile },
-        include: { center: true },
+        include: { 
+          center: true,
+          services: true,
+        },
         orderBy: { createdAt: 'desc' },
       });
     },
@@ -411,7 +417,10 @@ export const resolvers = {
 
       const booking = await context.prisma.slotBooking.findUnique({
         where: { id },
-        include: { center: true },
+        include: { 
+          center: true,
+          services: true,
+        },
       });
 
       if (!booking) {
@@ -956,22 +965,6 @@ export const resolvers = {
             },
           });
 
-          // Automatically transition from RECEIVED to WASHING
-          setTimeout(async () => {
-            try {
-              await context.prisma.vehicle.update({
-                where: { id: updatedVehicle.id },
-                data: {
-                  status: VehicleStatus.WASHING,
-                  washingAt: new Date(),
-                },
-              });
-              console.log(`✅ Vehicle ${updatedVehicle.vehicleNumber} automatically transitioned to WASHING`);
-            } catch (error) {
-              console.error('Failed to auto-transition vehicle to WASHING:', error);
-            }
-          }, 2000);
-
           // Send SMS notification
           if (updatedVehicle.customer?.name && center?.name) {
             await sendVehicleReceivedSms(
@@ -1082,37 +1075,6 @@ export const resolvers = {
           center: true,
         },
       });
-
-      // Automatically transition from RECEIVED to WASHING after entry
-      if (isStaff && vehicleData.status === 'RECEIVED') {
-        const serviceType = input.serviceType || ServiceType.WASH;
-        
-        // For WASH service, transition to WASHING
-        // For BODY_REPAIR service, transition to BODY_REPAIR_ASSESSMENT
-        setTimeout(async () => {
-          try {
-            const nextStatus = serviceType === ServiceType.WASH 
-              ? VehicleStatus.WASHING 
-              : VehicleStatus.BODY_REPAIR_ASSESSMENT;
-            
-            const updateData: any = { status: nextStatus };
-            
-            if (serviceType === ServiceType.WASH) {
-              updateData.washingAt = new Date();
-            } else {
-              updateData.bodyRepairAssessmentAt = new Date();
-            }
-            
-            await context.prisma.vehicle.update({
-              where: { id: vehicle.id },
-              data: updateData,
-            });
-            console.log(`✅ Vehicle ${vehicle.vehicleNumber} automatically transitioned to ${nextStatus}`);
-          } catch (error) {
-            console.error('Failed to auto-transition vehicle:', error);
-          }
-        }, 2000); // 2 seconds delay
-      }
 
       // Send SMS notification only if staff added the vehicle (actually received)
       if (isStaff && customerData.name && center?.name) {
@@ -1888,8 +1850,27 @@ export const resolvers = {
           bodyRepair: input.bodyRepair || false,
           otp,
           centerId: input.centerId,
+          services: {
+            create: [
+              ...(input.carWash ? [{
+                serviceType: 'CAR_WASH',
+                status: 'BOOKED',
+              }] : []),
+              ...(input.twoWheelerWash ? [{
+                serviceType: 'TWO_WHEELER_WASH',
+                status: 'BOOKED',
+              }] : []),
+              ...(input.bodyRepair ? [{
+                serviceType: 'BODY_REPAIR',
+                status: 'BOOKED',
+              }] : []),
+            ],
+          },
         },
-        include: { center: true },
+        include: { 
+          center: true,
+          services: true,
+        },
       });
 
       console.log(`[Slot Booking] Created booking ${booking.id} - Slot decremented for ${input.vehicleType}`);
@@ -1964,21 +1945,6 @@ export const resolvers = {
         },
       });
 
-      setTimeout(async () => {
-        try {
-          const nextStatus = serviceType === ServiceType.WASH 
-            ? VehicleStatus.WASHING 
-            : VehicleStatus.BODY_REPAIR_ASSESSMENT;
-          
-          await context.prisma.vehicle.update({
-            where: { id: vehicle.id },
-            data: { status: nextStatus },
-          });
-        } catch (error) {
-          console.error('Failed to auto-transition vehicle:', error);
-        }
-      }, 2000);
-
       if (vehicle.customer?.name && booking.center?.name) {
         await sendVehicleReceivedSms(
           vehicle.customer.mobile,
@@ -1996,7 +1962,10 @@ export const resolvers = {
 
       const booking = await context.prisma.slotBooking.findUnique({
         where: { id: bookingId },
-        include: { center: true },
+        include: { 
+          center: true,
+          services: true,
+        },
       });
 
       if (!booking) {
@@ -2008,11 +1977,18 @@ export const resolvers = {
         throw new Error('Unauthorized');
       }
 
-      if (booking.status !== SlotBookingStatus.PENDING) {
-        throw new Error('Only pending bookings can be cancelled');
+      if (booking.status !== SlotBookingStatus.PENDING && booking.status !== SlotBookingStatus.VERIFIED) {
+        throw new Error('Only pending or verified bookings can be cancelled');
       }
 
-      // Restore slot availability when cancelling
+      const anyServiceStarted = booking.services.some(
+        (service: any) => ['STARTED', 'IN_PROGRESS', 'COMPLETED'].includes(service.status)
+      );
+
+      if (anyServiceStarted) {
+        throw new Error('Cannot cancel: one or more services have already started');
+      }
+
       const isTwoWheeler = booking.vehicleType === 'TWO_WHEELER';
       const slotField = isTwoWheeler
         ? 'availableSlotsTwoWheeler'
@@ -2024,7 +2000,6 @@ export const resolvers = {
       const currentAvailable = booking.center[slotField];
       const dailyLimit = booking.center[dailySlotField];
 
-      // Only increment if we haven't reached the daily limit
       if (currentAvailable < dailyLimit) {
         await context.prisma.center.update({
           where: { id: booking.centerId },
@@ -2037,13 +2012,206 @@ export const resolvers = {
         console.log(`[Slot Booking] Slot restored for cancelled booking ${bookingId}`);
       }
 
+      await context.prisma.slotService.updateMany({
+        where: { 
+          slotBookingId: bookingId,
+          status: 'BOOKED',
+        },
+        data: {
+          status: 'CANCELLED',
+          cancelledAt: new Date(),
+          cancelledBy: context.user!.id,
+          cancelledByRole: context.user!.role,
+          cancelledByName: context.user!.name || 'User',
+        },
+      });
+
       const updatedBooking = await context.prisma.slotBooking.update({
         where: { id: bookingId },
-        data: { status: SlotBookingStatus.CANCELLED },
-        include: { center: true },
+        data: { 
+          status: SlotBookingStatus.CANCELLED,
+          cancelledByRole: context.user!.role,
+          cancelledByName: context.user!.name || 'User',
+          cancelledAt: new Date(),
+        },
+        include: { 
+          center: true,
+          services: true,
+        },
       });
 
       return updatedBooking;
+    },
+
+    cancelSlotByStaff: async (_: any, { bookingId }: any, context: Context) => {
+      requireStaff(context);
+
+      const booking = await context.prisma.slotBooking.findUnique({
+        where: { id: bookingId },
+        include: { 
+          center: true,
+          services: true,
+        },
+      });
+
+      if (!booking) {
+        throw new Error('Booking not found');
+      }
+
+      if (booking.status === SlotBookingStatus.CANCELLED) {
+        throw new Error('Booking is already cancelled');
+      }
+
+      const isTwoWheeler = booking.vehicleType === 'TWO_WHEELER';
+      const slotField = isTwoWheeler
+        ? 'availableSlotsTwoWheeler'
+        : 'availableSlotsCar';
+      const dailySlotField = isTwoWheeler
+        ? 'dailySlotsTwoWheeler'
+        : 'dailySlotsCar';
+
+      const currentAvailable = booking.center[slotField];
+      const dailyLimit = booking.center[dailySlotField];
+
+      if (currentAvailable < dailyLimit && booking.status === SlotBookingStatus.PENDING) {
+        await context.prisma.center.update({
+          where: { id: booking.centerId },
+          data: {
+            [slotField]: {
+              increment: 1,
+            },
+          },
+        });
+        console.log(`[Slot Booking] Slot restored for staff-cancelled booking ${bookingId}`);
+      }
+
+      await context.prisma.slotService.updateMany({
+        where: { slotBookingId: bookingId },
+        data: {
+          status: 'CANCELLED',
+          cancelledAt: new Date(),
+          cancelledBy: context.user!.id,
+          cancelledByRole: context.user!.role,
+          cancelledByName: context.user!.name || 'Staff',
+        },
+      });
+
+      const updatedBooking = await context.prisma.slotBooking.update({
+        where: { id: bookingId },
+        data: { 
+          status: SlotBookingStatus.CANCELLED,
+          cancelledByRole: context.user!.role,
+          cancelledByName: context.user!.name || 'Staff',
+          cancelledAt: new Date(),
+        },
+        include: { 
+          center: true,
+          services: true,
+        },
+      });
+
+      return updatedBooking;
+    },
+
+    startService: async (_: any, { serviceId }: any, context: Context) => {
+      requireStaff(context);
+
+      const service = await context.prisma.slotService.findUnique({
+        where: { id: serviceId },
+      });
+
+      if (!service) {
+        throw new Error('Service not found');
+      }
+
+      if (service.status !== 'BOOKED') {
+        throw new Error('Only booked services can be started');
+      }
+
+      const updatedService = await context.prisma.slotService.update({
+        where: { id: serviceId },
+        data: {
+          status: 'STARTED',
+          startedAt: new Date(),
+          startedBy: context.user!.id,
+        },
+      });
+
+      return updatedService;
+    },
+
+    updateServiceStatus: async (_: any, { serviceId, status, notes }: any, context: Context) => {
+      requireStaff(context);
+
+      const service = await context.prisma.slotService.findUnique({
+        where: { id: serviceId },
+      });
+
+      if (!service) {
+        throw new Error('Service not found');
+      }
+
+      if (service.status === 'CANCELLED') {
+        throw new Error('Cannot update cancelled service');
+      }
+
+      const updateData: any = {
+        status,
+        notes,
+      };
+
+      if (status === 'COMPLETED') {
+        updateData.completedAt = new Date();
+        updateData.completedBy = context.user!.id;
+      }
+
+      const updatedService = await context.prisma.slotService.update({
+        where: { id: serviceId },
+        data: updateData,
+      });
+
+      return updatedService;
+    },
+
+    cancelService: async (_: any, { serviceId }: any, context: Context) => {
+      requireAuth(context);
+
+      const service = await context.prisma.slotService.findUnique({
+        where: { id: serviceId },
+        include: {
+          slotBooking: true,
+        },
+      });
+
+      if (!service) {
+        throw new Error('Service not found');
+      }
+
+      const isCustomer = context.user!.role === UserRole.CUSTOMER;
+      if (isCustomer && service.slotBooking.customerMobile !== context.user!.mobile) {
+        throw new Error('Unauthorized');
+      }
+
+      if (isCustomer && ['STARTED', 'IN_PROGRESS', 'COMPLETED'].includes(service.status)) {
+        throw new Error('Cannot cancel: service has already started');
+      }
+
+      if (service.status === 'CANCELLED') {
+        throw new Error('Service is already cancelled');
+      }
+
+      const updatedService = await context.prisma.slotService.update({
+        where: { id: serviceId },
+        data: {
+          status: 'CANCELLED',
+          cancelledAt: new Date(),
+          cancelledBy: context.user!.id,
+          cancelledByRole: context.user!.role,
+          cancelledByName: context.user!.name || 'User',
+        },
+      });
+
+      return updatedService;
     },
 
     updateSystemConfig: async (_: any, { key, value }: any, context: Context) => {

@@ -65,6 +65,20 @@ export const typeDefs = gql`
     REJECTED
   }
 
+  enum SlotServiceStatus {
+    BOOKED
+    STARTED
+    IN_PROGRESS
+    COMPLETED
+    CANCELLED
+  }
+
+  enum SlotServiceType {
+    CAR_WASH
+    TWO_WHEELER_WASH
+    BODY_REPAIR
+  }
+
   type User {
     id: ID!
     mobile: String!
@@ -313,9 +327,30 @@ export const typeDefs = gql`
     otp: String!
     status: SlotBookingStatus!
     rejectionReason: String
+    cancelledByRole: String
+    cancelledByName: String
+    cancelledAt: DateTime
     verifiedAt: DateTime
     verifiedBy: String
     center: Center!
+    services: [SlotService!]!
+    createdAt: DateTime!
+  }
+
+  type SlotService {
+    id: ID!
+    slotBookingId: String!
+    serviceType: SlotServiceType!
+    status: SlotServiceStatus!
+    startedAt: DateTime
+    startedBy: String
+    completedAt: DateTime
+    completedBy: String
+    cancelledAt: DateTime
+    cancelledBy: String
+    cancelledByRole: String
+    cancelledByName: String
+    notes: String
     createdAt: DateTime!
   }
 
@@ -467,6 +502,12 @@ export const typeDefs = gql`
     createSlotBooking(input: CreateSlotBookingInput!): SlotBooking!
     verifySlotBooking(input: VerifySlotBookingInput!): Vehicle!
     cancelSlotBooking(bookingId: ID!): SlotBooking!
+    cancelSlotByStaff(bookingId: ID!): SlotBooking!
+    
+    # Slot Service Management
+    startService(serviceId: ID!): SlotService!
+    updateServiceStatus(serviceId: ID!, status: SlotServiceStatus!, notes: String): SlotService!
+    cancelService(serviceId: ID!): SlotService!
 
     # System Config (Admin only)
     updateSystemConfig(key: String!, value: String!): SystemConfig!

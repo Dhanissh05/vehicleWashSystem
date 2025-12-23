@@ -7,7 +7,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -221,15 +221,42 @@ model SlotBooking {
   bodyRepair        Boolean   @default(false)
   otp               String
   status            String    @default("PENDING")
-  rejectionReason   String?   // Reason for rejection: NO_SHOW, MANUAL_CANCEL, etc.
+  rejectionReason   String?
+  cancelledByRole   String?
+  cancelledByName   String?
+  cancelledAt       DateTime?
   verifiedAt        DateTime?
   verifiedBy        String?
   centerId          String
   center            Center    @relation(fields: [centerId], references: [id])
+  services          SlotService[]
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
   @@index([customerMobile])
   @@index([status])
   @@index([otp])
+}
+
+model SlotService {
+  id            String       @id @default(uuid())
+  slotBookingId String
+  slotBooking   SlotBooking  @relation(fields: [slotBookingId], references: [id], onDelete: Cascade)
+  serviceType   String
+  status        String       @default("BOOKED")
+  startedAt     DateTime?
+  startedBy     String?
+  completedAt   DateTime?
+  completedBy   String?
+  cancelledAt   DateTime?
+  cancelledBy   String?
+  cancelledByRole String?
+  cancelledByName String?
+  notes         String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([slotBookingId])
+  @@index([status])
+  @@index([serviceType])
 }

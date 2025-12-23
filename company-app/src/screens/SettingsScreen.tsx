@@ -1047,6 +1047,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
+    color: '#1F2937',
     backgroundColor: '#F9FAFB',
   },
   textArea: {

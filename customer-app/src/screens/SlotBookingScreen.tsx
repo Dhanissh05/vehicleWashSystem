@@ -413,6 +413,7 @@ const SlotBookingScreen = ({ navigation }: any) => {
               value={vehicleNumber}
               onChangeText={(text) => setVehicleNumber(text.toUpperCase())}
               placeholder="e.g., KA01AB1234"
+              placeholderTextColor="#9CA3AF"
               autoCapitalize="characters"
               maxLength={15}
             />
@@ -844,6 +845,7 @@ const styles = StyleSheet.create({
   },
   picker: {
     height: 50,
+    color: '#1F2937',
   },
   switchButton: {
     marginTop: 8,

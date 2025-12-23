@@ -7,6 +7,8 @@ import {
   Image,
   Modal,
   Animated,
+  ScrollView,
+  Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, gql } from '@apollo/client';
@@ -31,6 +33,7 @@ interface MenuModalProps {
 
 export default function MenuModal({ visible, onClose, navigation }: MenuModalProps) {
   const [userName, setUserName] = useState('Guest');
+  const [scrollKey, setScrollKey] = useState(0);
   const { data: userData, refetch: refetchUser } = useQuery(GET_USER_PROFILE, {
     fetchPolicy: 'network-only',
   });
@@ -49,6 +52,8 @@ export default function MenuModal({ visible, onClose, navigation }: MenuModalPro
       // Refetch user profile and config to get latest data
       refetchUser();
       refetchConfig();
+      // Force ScrollView to remount by changing key
+      setScrollKey(prev => prev + 1);
     }
   }, [visible]);
 
@@ -136,7 +141,16 @@ export default function MenuModal({ visible, onClose, navigation }: MenuModalPro
           </View>
 
           {/* Menu Items */}
-          <View style={styles.menuSection}>
+          <ScrollView 
+            key={scrollKey}
+            style={styles.menuSection}
+            showsVerticalScrollIndicator={true}
+            bounces={true}
+            scrollEnabled={true}
+            nestedScrollEnabled={true}
+            removeClippedSubviews={false}
+            contentContainerStyle={styles.scrollContent}
+          >
             <TouchableOpacity
               style={styles.menuItem}
               onPress={() => handleNavigate('HomeMain')}
@@ -198,7 +212,7 @@ export default function MenuModal({ visible, onClose, navigation }: MenuModalPro
               <Text style={styles.menuIcon}>👤</Text>
               <Text style={styles.menuText}>Profile</Text>
             </TouchableOpacity>
-          </View>
+          </ScrollView>
 
           {/* Footer with Logout */}
           <View style={styles.footer}>
@@ -225,7 +239,7 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 20,
-    paddingTop: 50,
+    paddingTop: Platform.OS === 'android' ? 40 : 50,
     backgroundColor: '#3B82F6',
     alignItems: 'center',
   },
@@ -259,7 +273,10 @@ const styles = StyleSheet.create({
   },
   menuSection: {
     flex: 1,
+  },
+  scrollContent: {
     paddingTop: 20,
+    paddingBottom: 120,
   },
   menuItem: {
     flexDirection: 'row',

@@ -9,11 +9,14 @@ import {
   Image,
   ScrollView,
   Platform,
+  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, gql } from '@apollo/client';
 import CalendarIcon from './CalendarIcon';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const GET_CENTER = gql`
   query GetCenter {
@@ -40,6 +43,7 @@ export default function MenuModal({ visible, onClose, navigation }: MenuModalPro
   const [userName, setUserName] = useState('User');
   const [userRole, setUserRole] = useState('');
   const [loadingUser, setLoadingUser] = useState(true);
+  const [scrollKey, setScrollKey] = useState(0);
   const slideAnim = useRef(new Animated.Value(0)).current;
   const { data, refetch } = useQuery(GET_CENTER);
   const insets = useSafeAreaInsets();
@@ -51,6 +55,8 @@ export default function MenuModal({ visible, onClose, navigation }: MenuModalPro
       console.log('📂 MenuModal - Opening drawer menu');
       loadUserData();
       refetch(); // Refetch to get latest user data including photo
+      // Force ScrollView to remount by changing key
+      setScrollKey(prev => prev + 1);
     }
   }, [visible]);
 
@@ -146,13 +152,14 @@ export default function MenuModal({ visible, onClose, navigation }: MenuModalPro
 
           {/* Menu Items */}
           <ScrollView 
+            key={scrollKey}
             style={styles.menuSection} 
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 20 }}
-            onScroll={(event) => {
-              console.log('📜 ScrollView scroll position:', event.nativeEvent.contentOffset.y);
-            }}
-            scrollEventThrottle={400}
+            showsVerticalScrollIndicator={true}
+            bounces={true}
+            scrollEnabled={true}
+            nestedScrollEnabled={true}
+            removeClippedSubviews={false}
+            contentContainerStyle={styles.scrollContent}
           >
             <TouchableOpacity
               style={styles.menuItem}
@@ -309,7 +316,7 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 20,
-    paddingTop: 50,
+    paddingTop: Platform.OS === 'android' ? 40 : 50,
     backgroundColor: '#8B5CF6',
     alignItems: 'center',
   },
@@ -347,7 +354,10 @@ const styles = StyleSheet.create({
   },
   menuSection: {
     flex: 1,
+  },
+  scrollContent: {
     paddingTop: 20,
+    paddingBottom: 120,
   },
   menuItem: {
     flexDirection: 'row',
