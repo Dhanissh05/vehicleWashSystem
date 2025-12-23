@@ -29,6 +29,10 @@ const GET_ACTIVE_VEHICLES = gql`
       receivedAt
       washingAt
       readyAt
+      center {
+        id
+        name
+      }
       customer {
         name
         mobile
@@ -41,6 +45,22 @@ const GET_ACTIVE_VEHICLES = gql`
         status
         amount
         method
+      }
+      slotBooking {
+        id
+        carWash
+        twoWheelerWash
+        bodyRepair
+        status
+        services {
+          id
+          serviceType
+          status
+          startedAt
+          startedBy
+          completedAt
+          notes
+        }
       }
     }
   }
@@ -57,19 +77,71 @@ const UPDATE_VEHICLE_STATUS = gql`
   }
 `;
 
+const START_SERVICE = gql`
+  mutation StartService($serviceId: ID!) {
+    startService(serviceId: $serviceId) {
+      id
+      status
+      startedAt
+    }
+  }
+`;
+
+const UPDATE_SERVICE_STATUS = gql`
+  mutation UpdateServiceStatus($serviceId: ID!, $status: SlotServiceStatus!, $notes: String) {
+    updateServiceStatus(serviceId: $serviceId, status: $status, notes: $notes) {
+      id
+      status
+      completedAt
+    }
+  }
+`;
+
 export default function WashCycleScreen({ navigation }: any) {
   const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
+  const [selectedService, setSelectedService] = useState<any>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [serviceModalVisible, setServiceModalVisible] = useState(false);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [notes, setNotes] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
 
-  const { data, loading, refetch } = useQuery(GET_ACTIVE_VEHICLES, {
+  const { data, loading, refetch, error } = useQuery(GET_ACTIVE_VEHICLES, {
     fetchPolicy: 'network-only',
+    onError: (err) => {
+      console.error('❌ GraphQL Query Error:', err);
+      console.error('❌ Error message:', err.message);
+      console.error('❌ Network error:', err.networkError);
+      console.error('❌ GraphQL errors:', err.graphQLErrors);
+    },
   });
 
   const [updateStatus, { loading: updating }] = useMutation(UPDATE_VEHICLE_STATUS, {
     refetchQueries: [{ query: GET_ACTIVE_VEHICLES }],
+  });
+
+  const [startService] = useMutation(START_SERVICE, {
+    onCompleted: () => {
+      Alert.alert('Success', 'Service started');
+      refetch();
+    },
+    onError: (error) => {
+      console.error('❌ Start service error:', error);
+      Alert.alert('Error', error.message || 'Failed to start service');
+    },
+  });
+
+  const [updateServiceStatus] = useMutation(UPDATE_SERVICE_STATUS, {
+    onCompleted: () => {
+      Alert.alert('Success', 'Service status updated');
+      setServiceModalVisible(false);
+      setSelectedService(null);
+      setNotes('');
+      refetch();
+    },
+    onError: (error) => {
+      Alert.alert('Error', error.message);
+    },
   });
 
   const getStatusColor = (status: string) => {
@@ -136,6 +208,42 @@ export default function WashCycleScreen({ navigation }: any) {
       setSelectedStatus(statusOptions[0]);
     }
     setModalVisible(true);
+  };
+
+  const handleStartService = (service: any) => {
+    Alert.alert(
+      'Start Service',
+      `Start ${service.serviceType === 'CAR_WASH' ? 'Car Wash' : 
+               service.serviceType === 'TWO_WHEELER_WASH' ? 'Two Wheeler Wash' : 
+               'Body Repair'}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Start',
+          onPress: () => {
+            startService({ variables: { serviceId: service.id } });
+          },
+        },
+      ]
+    );
+  };
+
+  const handleOpenServiceModal = (service: any) => {
+    setSelectedService(service);
+    setNotes('');
+    setServiceModalVisible(true);
+  };
+
+  const handleSubmitServiceUpdate = (newStatus: string) => {
+    if (!selectedService) return;
+
+    updateServiceStatus({
+      variables: {
+        serviceId: selectedService.id,
+        status: newStatus,
+        notes: notes || null,
+      },
+    });
   };
 
   const handleUpdateStatus = async () => {
@@ -220,6 +328,54 @@ export default function WashCycleScreen({ navigation }: any) {
             </View>
           )}
 
+          {/* Show Services if from slot booking */}
+          {item.slotBooking?.services && item.slotBooking.services.length > 0 && (
+            <View style={styles.servicesSection}>
+              <Text style={styles.servicesTitle}>Services:</Text>
+              {item.slotBooking.services.map((service: any) => (
+                <View key={service.id} style={styles.serviceItem}>
+                  <View style={styles.serviceHeader}>
+                    <Text style={styles.serviceName}>
+                      {service.serviceType === 'CAR_WASH' ? '🚗 Car Wash' :
+                       service.serviceType === 'TWO_WHEELER_WASH' ? '🏍️ Two Wheeler Wash' :
+                       '🔧 Body Repair'}
+                    </Text>
+                    <View style={[
+                      styles.serviceStatusBadge,
+                      service.status === 'BOOKED' && styles.serviceBooked,
+                      service.status === 'STARTED' && styles.serviceStarted,
+                      service.status === 'IN_PROGRESS' && styles.serviceInProgress,
+                      service.status === 'COMPLETED' && styles.serviceCompleted,
+                    ]}>
+                      <Text style={styles.serviceStatusText}>{service.status}</Text>
+                    </View>
+                  </View>
+                  {service.status === 'BOOKED' && (
+                    <TouchableOpacity
+                      style={styles.startServiceButton}
+                      onPress={() => handleStartService(service)}
+                    >
+                      <Text style={styles.startServiceButtonText}>▶ Start Service</Text>
+                    </TouchableOpacity>
+                  )}
+                  {(service.status === 'STARTED' || service.status === 'IN_PROGRESS') && (
+                    <TouchableOpacity
+                      style={styles.updateServiceButton}
+                      onPress={() => handleOpenServiceModal(service)}
+                    >
+                      <Text style={styles.updateServiceButtonText}>Update Status</Text>
+                    </TouchableOpacity>
+                  )}
+                  {service.startedAt && (
+                    <Text style={styles.serviceTime}>
+                      Started: {new Date(service.startedAt).toLocaleString()}
+                    </Text>
+                  )}
+                </View>
+              ))}
+            </View>
+          )}
+
           <View style={styles.infoRow}>
             <Text style={styles.label}>Payment:</Text>
             {item.payment ? (
@@ -265,10 +421,63 @@ export default function WashCycleScreen({ navigation }: any) {
     );
   };
 
-  // Filter active vehicles (exclude DELIVERED and only WASH service)
+  // Filter active vehicles (exclude DELIVERED)
+  // Show vehicles from slot bookings (new system) or WASH service vehicles (old system)
   const activeVehicles = data?.vehicles?.filter(
-    (v: any) => v.serviceType === 'WASH' && v.status !== 'DELIVERED'
+    (v: any) => {
+      // Exclude delivered vehicles
+      if (v.status === 'DELIVERED') return false;
+      
+      // Include all vehicles that have a slot booking (new system)
+      if (v.slotBooking) return true;
+      
+      // Include WASH service vehicles (old system without slot booking)
+      if (v.serviceType === 'WASH') return true;
+      
+      return false;
+    }
   ) || [];
+
+  // Debug logging
+  console.log('=== WASH CYCLE RENDER ===');
+  console.log('Loading:', loading);
+  console.log('Error:', error);
+  console.log('Data:', data);
+  console.log('Has vehicles:', !!data?.vehicles);
+  console.log('Vehicles count:', data?.vehicles?.length);
+  
+  if (data?.vehicles) {
+    console.log('=== WASH CYCLE DEBUG ===');
+    console.log('Total vehicles:', data.vehicles.length);
+    console.log('RECEIVED vehicles:', data.vehicles.filter((v: any) => v.status === 'RECEIVED').length);
+    console.log('Vehicles with slot bookings:', data.vehicles.filter((v: any) => v.slotBooking).length);
+    console.log('WASH service vehicles:', data.vehicles.filter((v: any) => v.serviceType === 'WASH').length);
+    console.log('Active vehicles (filtered):', activeVehicles.length);
+    
+    // Log each vehicle's details
+    data.vehicles.forEach((v: any) => {
+      console.log(`Vehicle ${v.vehicleNumber}:`, {
+        status: v.status,
+        serviceType: v.serviceType,
+        hasSlotBooking: !!v.slotBooking,
+        slotBookingId: v.slotBookingId,
+        delivered: v.status === 'DELIVERED',
+      });
+    });
+    
+    const receivedWash = data.vehicles.filter((v: any) => 
+      v.status === 'RECEIVED' && v.serviceType === 'WASH'
+    );
+    if (receivedWash.length > 0) {
+      console.log('RECEIVED WASH vehicles:', receivedWash.map((v: any) => ({
+        number: v.vehicleNumber,
+        serviceType: v.serviceType,
+        status: v.status,
+        hasSlotBooking: !!v.slotBooking,
+      })));
+    }
+    console.log('=== END DEBUG ===');
+  }
 
   return (
     <View style={styles.container}>
@@ -395,6 +604,72 @@ export default function WashCycleScreen({ navigation }: any) {
           }}
         />
       )}
+
+      {/* Service Update Modal */}
+      <Modal
+        visible={serviceModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setServiceModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Update Service Status</Text>
+
+            {selectedService && (
+              <>
+                <Text style={styles.modalVehicleNumber}>
+                  {selectedService.serviceType === 'CAR_WASH' ? '🚗 Car Wash' :
+                   selectedService.serviceType === 'TWO_WHEELER_WASH' ? '🏍️ Two Wheeler Wash' :
+                   '🔧 Body Repair'}
+                </Text>
+                <Text style={styles.modalCurrentStatus}>
+                  Current: {selectedService.status}
+                </Text>
+
+                <Text style={styles.label}>Select New Status</Text>
+                <View style={styles.serviceStatusOptions}>
+                  {selectedService.status === 'STARTED' && (
+                    <TouchableOpacity
+                      style={styles.serviceStatusButton}
+                      onPress={() => handleSubmitServiceUpdate('IN_PROGRESS')}
+                    >
+                      <Text style={styles.serviceStatusButtonText}>IN PROGRESS</Text>
+                    </TouchableOpacity>
+                  )}
+                  {(selectedService.status === 'STARTED' || selectedService.status === 'IN_PROGRESS') && (
+                    <TouchableOpacity
+                      style={[styles.serviceStatusButton, styles.serviceStatusButtonComplete]}
+                      onPress={() => handleSubmitServiceUpdate('COMPLETED')}
+                    >
+                      <Text style={[styles.serviceStatusButtonText, styles.serviceStatusButtonTextComplete]}>
+                        COMPLETE
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <Text style={styles.label}>Notes (Optional)</Text>
+                <TextInput
+                  style={styles.notesInput}
+                  placeholder="Add notes about the service..."
+                  value={notes}
+                  onChangeText={setNotes}
+                  multiline
+                  numberOfLines={3}
+                />
+
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={() => setServiceModalVisible(false)}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -698,5 +973,106 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 14,
+  },
+  servicesSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  servicesTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  serviceItem: {
+    backgroundColor: '#F9FAFB',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  serviceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  serviceName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  serviceStatusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  serviceBooked: {
+    backgroundColor: '#DBEAFE',
+  },
+  serviceStarted: {
+    backgroundColor: '#FEF3C7',
+  },
+  serviceInProgress: {
+    backgroundColor: '#FECACA',
+  },
+  serviceCompleted: {
+    backgroundColor: '#D1FAE5',
+  },
+  serviceStatusText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  startServiceButton: {
+    backgroundColor: '#3B82F6',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  startServiceButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  updateServiceButton: {
+    backgroundColor: '#F59E0B',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  updateServiceButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  serviceTime: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginTop: 4,
+  },
+  serviceStatusOptions: {
+    marginVertical: 16,
+  },
+  serviceStatusButton: {
+    backgroundColor: '#F59E0B',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  serviceStatusButtonComplete: {
+    backgroundColor: '#10B981',
+  },
+  serviceStatusButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  serviceStatusButtonTextComplete: {
+    color: '#fff',
   },
 });

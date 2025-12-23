@@ -235,10 +235,28 @@ export default function SlotBookingsScreen({ navigation }: any) {
     if (item.twoWheelerWash) services.push('🏍️ Two Wheeler');
     if (item.bodyRepair) services.push('🔧 Body Repair');
 
+    const handleCardPress = () => {
+      if (item.status === 'VERIFIED') {
+        Alert.alert(
+          'Verified Booking',
+          'This booking has been verified. Please manage services from the Wash Cycle screen.',
+          [
+            { text: 'OK' },
+            { 
+              text: 'Go to Wash Cycle', 
+              onPress: () => navigation.navigate('WashCycle')
+            }
+          ]
+        );
+      } else {
+        navigation.navigate('SlotBookingDetail', { bookingId: item.id });
+      }
+    };
+
     return (
       <TouchableOpacity
         style={styles.bookingCard}
-        onPress={() => navigation.navigate('SlotBookingDetail', { bookingId: item.id })}
+        onPress={handleCardPress}
       >
         <View style={styles.bookingHeader}>
           <View>
@@ -296,9 +314,19 @@ export default function SlotBookingsScreen({ navigation }: any) {
           </View>
         )}
 
-        <View style={styles.viewDetailsHint}>
-          <Text style={styles.viewDetailsText}>Tap for details →</Text>
-        </View>
+        {item.status === 'VERIFIED' && (
+          <View style={styles.verifiedNote}>
+            <Text style={styles.verifiedNoteText}>
+              ✓ Verified - Manage in Wash Cycle
+            </Text>
+          </View>
+        )}
+
+        {item.status !== 'VERIFIED' && (
+          <View style={styles.viewDetailsHint}>
+            <Text style={styles.viewDetailsText}>Tap for details →</Text>
+          </View>
+        )}
       </TouchableOpacity>
     );
   };
@@ -495,6 +523,20 @@ const styles = StyleSheet.create({
   viewDetailsText: {
     fontSize: 12,
     color: '#8B5CF6',
+    fontWeight: '600',
+  },
+  verifiedNote: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#D1FAE5',
+    borderRadius: 8,
+    marginTop: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#10B981',
+  },
+  verifiedNoteText: {
+    fontSize: 13,
+    color: '#065F46',
     fontWeight: '600',
   },
   emptyContainer: { alignItems: 'center', padding: 40 },

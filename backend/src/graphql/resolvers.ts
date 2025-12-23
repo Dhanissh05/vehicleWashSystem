@@ -130,6 +130,12 @@ export const resolvers = {
           customer: true,
           worker: true,
           payment: true,
+          center: true,
+          slotBooking: {
+            include: {
+              services: true,
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
         take: limit,
@@ -180,6 +186,11 @@ export const resolvers = {
           worker: true,
           payment: true,
           center: true,
+          slotBooking: {
+            include: {
+              services: true,
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
       });
@@ -671,6 +682,15 @@ export const resolvers = {
     updateFcmToken: async (_: any, { token }: any, context: Context) => {
       const user = requireAuth(context);
       
+      // Check if user exists in database
+      const existingUser = await context.prisma.user.findUnique({
+        where: { id: user.id },
+      });
+
+      if (!existingUser) {
+        throw new Error('User not found. Please login again.');
+      }
+
       return await context.prisma.user.update({
         where: { id: user.id },
         data: { fcmToken: token },
@@ -1815,25 +1835,33 @@ export const resolvers = {
         }
       }
 
-      // Check slot availability before creating booking
-      const isTwoWheeler = input.vehicleType === 'TWO_WHEELER';
-      const availableSlots = isTwoWheeler 
-        ? center.availableSlotsTwoWheeler 
-        : center.availableSlotsCar;
+      // Check slot availability before creating booking (only for wash services)
+      const hasWashService = input.carWash || input.twoWheelerWash;
       
-      if (availableSlots <= 0) {
-        throw new Error('Slots are full, please come back later');
+      if (hasWashService) {
+        const isTwoWheeler = input.vehicleType === 'TWO_WHEELER';
+        const availableSlots = isTwoWheeler 
+          ? center.availableSlotsTwoWheeler 
+          : center.availableSlotsCar;
+        
+        if (availableSlots <= 0) {
+          throw new Error('Slots are full, please come back later');
+        }
+
+        // Decrement available slots when booking is created (only for wash services)
+        await context.prisma.center.update({
+          where: { id: input.centerId },
+          data: isTwoWheeler 
+            ? { availableSlotsTwoWheeler: { decrement: 1 } }
+            : { availableSlotsCar: { decrement: 1 } },
+        });
+        
+        console.log(`[Slot Booking] Slot decremented for ${input.vehicleType} (has wash service)`);
+      } else {
+        console.log(`[Slot Booking] No slot decrement for body repair only booking`);
       }
 
       const otp = generateOTP();
-
-      // Decrement available slots when booking is created
-      await context.prisma.center.update({
-        where: { id: input.centerId },
-        data: isTwoWheeler 
-          ? { availableSlotsTwoWheeler: { decrement: 1 } }
-          : { availableSlotsCar: { decrement: 1 } },
-      });
 
       const booking = await context.prisma.slotBooking.create({
         data: {
@@ -1873,8 +1901,6 @@ export const resolvers = {
           services: true,
         },
       });
-
-      console.log(`[Slot Booking] Created booking ${booking.id} - Slot decremented for ${input.vehicleType}`);
 
       return booking;
     },
@@ -1941,10 +1967,16 @@ export const resolvers = {
           receivedAt: new Date(),
           customerId: customer.id,
           centerId: booking.centerId,
+          slotBookingId: booking.id,
         },
         include: {
           customer: true,
           center: true,
+          slotBooking: {
+            include: {
+              services: true,
+            },
+          },
         },
       });
 
@@ -1992,27 +2024,37 @@ export const resolvers = {
         throw new Error('Cannot cancel: one or more services have already started');
       }
 
-      const isTwoWheeler = booking.vehicleType === 'TWO_WHEELER';
-      const slotField = isTwoWheeler
-        ? 'availableSlotsTwoWheeler'
-        : 'availableSlotsCar';
-      const dailySlotField = isTwoWheeler
-        ? 'dailySlotsTwoWheeler'
-        : 'dailySlotsCar';
+      // Increment slot if booking had car wash or two wheeler wash (respect max limit)
+      const hasWashService = booking.carWash || booking.twoWheelerWash;
+      
+      if (hasWashService) {
+        const isTwoWheeler = booking.vehicleType === 'TWO_WHEELER';
+        const slotField = isTwoWheeler
+          ? 'availableSlotsTwoWheeler'
+          : 'availableSlotsCar';
+        const dailySlotField = isTwoWheeler
+          ? 'dailySlotsTwoWheeler'
+          : 'dailySlotsCar';
 
-      const currentAvailable = booking.center[slotField];
-      const dailyLimit = booking.center[dailySlotField];
+        const currentAvailable = booking.center[slotField];
+        const dailyLimit = booking.center[dailySlotField];
 
-      if (currentAvailable < dailyLimit) {
-        await context.prisma.center.update({
-          where: { id: booking.centerId },
-          data: {
-            [slotField]: {
-              increment: 1,
+        // Only increment if current slots are less than daily limit
+        if (currentAvailable < dailyLimit) {
+          await context.prisma.center.update({
+            where: { id: booking.centerId },
+            data: {
+              [slotField]: {
+                increment: 1,
+              },
             },
-          },
-        });
-        console.log(`[Slot Booking] Slot restored for cancelled booking ${bookingId}`);
+          });
+          console.log(`[Slot Booking] Slot restored for cancelled booking ${bookingId} (had wash service, now ${currentAvailable + 1}/${dailyLimit})`);
+        } else {
+          console.log(`[Slot Booking] Slot already at max limit for ${bookingId} (${currentAvailable}/${dailyLimit})`);
+        }
+      } else {
+        console.log(`[Slot Booking] No slot restoration for ${bookingId} (body repair only, no wash service)`);
       }
 
       await context.prisma.slotService.updateMany({
@@ -2065,27 +2107,37 @@ export const resolvers = {
         throw new Error('Booking is already cancelled');
       }
 
-      const isTwoWheeler = booking.vehicleType === 'TWO_WHEELER';
-      const slotField = isTwoWheeler
-        ? 'availableSlotsTwoWheeler'
-        : 'availableSlotsCar';
-      const dailySlotField = isTwoWheeler
-        ? 'dailySlotsTwoWheeler'
-        : 'dailySlotsCar';
+      // Increment slot if booking had car wash or two wheeler wash (respect max limit)
+      const hasWashService = booking.carWash || booking.twoWheelerWash;
 
-      const currentAvailable = booking.center[slotField];
-      const dailyLimit = booking.center[dailySlotField];
+      if (hasWashService) {
+        const isTwoWheeler = booking.vehicleType === 'TWO_WHEELER';
+        const slotField = isTwoWheeler
+          ? 'availableSlotsTwoWheeler'
+          : 'availableSlotsCar';
+        const dailySlotField = isTwoWheeler
+          ? 'dailySlotsTwoWheeler'
+          : 'dailySlotsCar';
 
-      if (currentAvailable < dailyLimit && booking.status === SlotBookingStatus.PENDING) {
-        await context.prisma.center.update({
-          where: { id: booking.centerId },
-          data: {
-            [slotField]: {
-              increment: 1,
+        const currentAvailable = booking.center[slotField];
+        const dailyLimit = booking.center[dailySlotField];
+
+        // Only increment if current slots are less than daily limit
+        if (currentAvailable < dailyLimit) {
+          await context.prisma.center.update({
+            where: { id: booking.centerId },
+            data: {
+              [slotField]: {
+                increment: 1,
+              },
             },
-          },
-        });
-        console.log(`[Slot Booking] Slot restored for staff-cancelled booking ${bookingId}`);
+          });
+          console.log(`[Slot Booking] Slot restored for staff-cancelled booking ${bookingId} (had wash service, now ${currentAvailable + 1}/${dailyLimit})`);
+        } else {
+          console.log(`[Slot Booking] Slot already at max limit for ${bookingId} (${currentAvailable}/${dailyLimit})`);
+        }
+      } else {
+        console.log(`[Slot Booking] No slot restoration for ${bookingId} (body repair only, no wash service)`);
       }
 
       await context.prisma.slotService.updateMany({
@@ -2206,7 +2258,11 @@ export const resolvers = {
       const service = await context.prisma.slotService.findUnique({
         where: { id: serviceId },
         include: {
-          slotBooking: true,
+          slotBooking: {
+            include: {
+              center: true,
+            },
+          },
         },
       });
 
@@ -2225,6 +2281,51 @@ export const resolvers = {
 
       if (service.status === 'CANCELLED') {
         throw new Error('Service is already cancelled');
+      }
+
+      // Increment slot only if this is the last wash service in the booking
+      const isWashService = service.serviceType === 'CAR_WASH' || service.serviceType === 'TWO_WHEELER_WASH';
+      
+      if (isWashService) {
+        // Check if there are other active wash services in this booking
+        const otherWashServices = await context.prisma.slotService.findMany({
+          where: {
+            slotBookingId: service.slotBookingId,
+            id: { not: serviceId },
+            serviceType: { in: ['CAR_WASH', 'TWO_WHEELER_WASH'] },
+            status: { not: 'CANCELLED' },
+          },
+        });
+
+        // Only increment slot if this is the last wash service
+        if (otherWashServices.length === 0) {
+          const isTwoWheeler = service.slotBooking.vehicleType === 'TWO_WHEELER';
+          const slotField = isTwoWheeler
+            ? 'availableSlotsTwoWheeler'
+            : 'availableSlotsCar';
+          const dailySlotField = isTwoWheeler
+            ? 'dailySlotsTwoWheeler'
+            : 'dailySlotsCar';
+
+          const currentAvailable = service.slotBooking.center[slotField];
+          const dailyLimit = service.slotBooking.center[dailySlotField];
+
+          if (currentAvailable < dailyLimit) {
+            await context.prisma.center.update({
+              where: { id: service.slotBooking.centerId },
+              data: {
+                [slotField]: {
+                  increment: 1,
+                },
+              },
+            });
+            console.log(`[Service Cancellation] Slot restored - last wash service ${service.serviceType} cancelled for booking ${service.slotBookingId}`);
+          }
+        } else {
+          console.log(`[Service Cancellation] No slot restoration - other wash services still active in booking ${service.slotBookingId}`);
+        }
+      } else {
+        console.log(`[Service Cancellation] No slot restoration for ${service.serviceType} (body repair)`);
       }
 
       const updatedService = await context.prisma.slotService.update({

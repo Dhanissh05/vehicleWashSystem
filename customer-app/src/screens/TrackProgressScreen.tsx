@@ -21,22 +21,18 @@ interface TrackProgressScreenProps {
 
 /**
  * Track Progress Screen
- * Shows horizontal timeline for both Wash and Body Repair services
+ * Shows progress for all active vehicles with individual services from slot booking
  * 
- * For WASH service (3 steps):
- * 1. Vehicle Dropped (RECEIVED)
- * 2. Washing in Progress (WASHING)
- * 3. Ready for Pickup (READY_FOR_PICKUP)
+ * If vehicle has slot booking with multiple services (e.g., Car Wash + Body Repair),
+ * shows separate progress tracking for each service
  * 
- * For BODY_REPAIR service (5 steps):
- * 1. Assessment (BODY_REPAIR_ASSESSMENT)
- * 2. Repair In Progress (BODY_REPAIR_IN_PROGRESS)
- * 3. Painting (BODY_REPAIR_PAINTING)
- * 4. Repair Complete (BODY_REPAIR_COMPLETE)
- * 5. Ready for Pickup (READY_FOR_PICKUP)
+ * Each service shows its status:
+ * - BOOKED (waiting to start)
+ * - STARTED (service has begun)
+ * - IN_PROGRESS (actively being worked on)
+ * - COMPLETED (service finished)
  * 
- * Each step shows timestamp when status was updated
- * Completed steps are colored, current step is animated, future steps are grey
+ * Falls back to legacy vehicle status tracking if no slot booking exists
  */
 export default function TrackProgressScreen({ navigation, route }: TrackProgressScreenProps) {
   const vehicleId = route?.params?.vehicleId;
@@ -45,36 +41,188 @@ export default function TrackProgressScreen({ navigation, route }: TrackProgress
     pollInterval: 10000, // Poll every 10 seconds for real-time updates
   });
 
-  // Find specific vehicle or use first active vehicle
-  const vehicle = vehicleId
-    ? data?.myVehicles?.find((v: any) => v.id === vehicleId)
-    : data?.myVehicles?.find((v: any) => v.status !== 'DELIVERED');
+  // State for accordion expansion - track which services are expanded
+  const [expandedServices, setExpandedServices] = React.useState<{[key: string]: boolean}>({});
+  const [expandedVehicles, setExpandedVehicles] = React.useState<{[key: string]: boolean}>({});
 
-  const getStepStatus = (stepStatus: string) => {
-    if (!vehicle) return 'pending';
-    
-    const serviceType = vehicle.serviceType || 'WASH';
-    
-    let statusOrder: string[];
-    if (serviceType === 'BODY_REPAIR') {
-      statusOrder = [
-        'BODY_REPAIR_ASSESSMENT',
-        'BODY_REPAIR_IN_PROGRESS',
-        'BODY_REPAIR_PAINTING',
-        'BODY_REPAIR_COMPLETE',
-        'READY_FOR_PICKUP',
-        'DELIVERED'
-      ];
-    } else {
-      statusOrder = ['RECEIVED', 'WASHING', 'READY_FOR_PICKUP', 'DELIVERED'];
+  // Get all active vehicles (not DELIVERED)
+  const activeVehicles = data?.myVehicles?.filter((v: any) => v.status !== 'DELIVERED') || [];
+  
+  // If vehicleId is provided, show only that vehicle, otherwise show all active vehicles
+  const vehiclesToShow = vehicleId 
+    ? activeVehicles.filter((v: any) => v.id === vehicleId)
+    : activeVehicles;
+
+  // Toggle vehicle accordion
+  const toggleVehicle = (vehicleId: string) => {
+    setExpandedVehicles(prev => ({
+      ...prev,
+      [vehicleId]: !prev[vehicleId]
+    }));
+  };
+
+  // Toggle service accordion
+  const toggleService = (serviceId: string) => {
+    setExpandedServices(prev => ({
+      ...prev,
+      [serviceId]: !prev[serviceId]
+    }));
+  };
+
+  const getServiceIcon = (serviceType: string) => {
+    switch (serviceType) {
+      case 'CAR_WASH':
+        return '🚗';
+      case 'TWO_WHEELER_WASH':
+        return '🏍️';
+      case 'BODY_REPAIR':
+        return '🔧';
+      default:
+        return '⚙️';
     }
+  };
+
+  const getServiceName = (serviceType: string) => {
+    switch (serviceType) {
+      case 'CAR_WASH':
+        return 'Car Wash';
+      case 'TWO_WHEELER_WASH':
+        return 'Two Wheeler Wash';
+      case 'BODY_REPAIR':
+        return 'Body Repair';
+      default:
+        return serviceType;
+    }
+  };
+
+  const getServiceStatusColor = (status: string) => {
+    switch (status) {
+      case 'BOOKED':
+        return '#3B82F6';
+      case 'STARTED':
+        return '#F59E0B';
+      case 'IN_PROGRESS':
+        return '#EF4444';
+      case 'COMPLETED':
+        return '#10B981';
+      case 'CANCELLED':
+        return '#6B7280';
+      default:
+        return '#9CA3AF';
+    }
+  };
+
+  const getServiceStatusLabel = (status: string) => {
+    switch (status) {
+      case 'BOOKED':
+        return 'Waiting to Start';
+      case 'STARTED':
+        return 'Started';
+      case 'IN_PROGRESS':
+        return 'In Progress';
+      case 'COMPLETED':
+        return 'Completed';
+      case 'CANCELLED':
+        return 'Cancelled';
+      default:
+        return status;
+    }
+  };
+
+  const renderServiceProgress = (service: any) => {
+    const isExpanded = expandedServices[service.id] || false;
     
-    const currentIndex = statusOrder.indexOf(vehicle.status);
-    const stepIndex = statusOrder.indexOf(stepStatus);
-    
-    if (stepIndex < currentIndex) return 'completed';
-    if (stepIndex === currentIndex) return 'active';
-    return 'pending';
+    const steps = [
+      { status: 'BOOKED', label: 'Booked', icon: '📋' },
+      { status: 'STARTED', label: 'Started', icon: '▶️' },
+      { status: 'IN_PROGRESS', label: 'In Progress', icon: '⚙️' },
+      { status: 'COMPLETED', label: 'Completed', icon: '✅' },
+    ];
+
+    const currentStepIndex = steps.findIndex(s => s.status === service.status);
+
+    return (
+      <View style={styles.serviceCard}>
+        <TouchableOpacity 
+          style={styles.serviceHeader}
+          onPress={() => toggleService(service.id)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.serviceIconContainer}>
+            <Text style={styles.serviceIcon}>{getServiceIcon(service.serviceType)}</Text>
+            <View style={styles.serviceInfo}>
+              <Text style={styles.serviceName}>{getServiceName(service.serviceType)}</Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={[
+              styles.serviceStatusBadge,
+              { backgroundColor: getServiceStatusColor(service.status) }
+            ]}>
+              <Text style={styles.serviceStatusText}>{getServiceStatusLabel(service.status)}</Text>
+            </View>
+            <Text style={styles.accordionIcon}>{isExpanded ? '▼' : '▶'}</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Service Progress Steps - Only show when expanded */}
+        {isExpanded && (
+          <>
+            <View style={styles.serviceSteps}>
+              {steps.map((step, index) => {
+                const isCompleted = index < currentStepIndex;
+                const isActive = index === currentStepIndex;
+                const isPending = index > currentStepIndex;
+
+                return (
+                  <View key={step.status} style={styles.stepRow}>
+                    <View style={[
+                      styles.stepDot,
+                      isCompleted && styles.stepDotCompleted,
+                      isActive && styles.stepDotActive,
+                      isPending && styles.stepDotPending,
+                    ]}>
+                      <Text style={styles.stepDotIcon}>{step.icon}</Text>
+                    </View>
+                    <View style={styles.stepContent}>
+                      <Text style={[
+                        styles.stepLabel,
+                        isPending && styles.stepLabelPending,
+                      ]}>
+                        {step.label}
+                      </Text>
+                      {isActive && service.startedAt && (
+                        <Text style={styles.stepTime}>
+                          {formatTimestamp(service.startedAt)}
+                        </Text>
+                      )}
+                      {isCompleted && service.completedAt && step.status === 'COMPLETED' && (
+                        <Text style={styles.stepTime}>
+                          {formatTimestamp(service.completedAt)}
+                        </Text>
+                      )}
+                    </View>
+                    {index < steps.length - 1 && (
+                      <View style={[
+                        styles.stepConnector,
+                        isCompleted && styles.stepConnectorCompleted,
+                      ]} />
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+
+            {service.notes && (
+              <View style={styles.serviceNotes}>
+                <Text style={styles.serviceNotesLabel}>Notes:</Text>
+                <Text style={styles.serviceNotesText}>{service.notes}</Text>
+              </View>
+            )}
+          </>
+        )}
+      </View>
+    );
   };
 
   const formatTimestamp = (timestamp: string | null) => {
@@ -87,73 +235,6 @@ export default function TrackProgressScreen({ navigation, route }: TrackProgress
       minute: '2-digit',
     });
   };
-
-  // Determine which steps to show based on service type
-  const serviceType = vehicle?.serviceType || 'WASH';
-  
-  const washSteps = [
-    {
-      status: 'RECEIVED',
-      icon: '📍',
-      title: 'Vehicle Dropped',
-      description: 'Vehicle received at center',
-      timestamp: vehicle?.receivedAt,
-    },
-    {
-      status: 'WASHING',
-      icon: '💧',
-      title: 'Washing in Progress',
-      description: 'Your vehicle is being washed',
-      timestamp: vehicle?.washingAt,
-    },
-    {
-      status: 'READY_FOR_PICKUP',
-      icon: '✅',
-      title: 'Ready for Pickup',
-      description: 'Vehicle is ready to collect',
-      timestamp: vehicle?.readyAt,
-    },
-  ];
-
-  const bodyRepairSteps = [
-    {
-      status: 'BODY_REPAIR_ASSESSMENT',
-      icon: '🔍',
-      title: 'Assessment',
-      description: 'Damage assessment in progress',
-      timestamp: vehicle?.bodyRepairAssessmentAt,
-    },
-    {
-      status: 'BODY_REPAIR_IN_PROGRESS',
-      icon: '🔧',
-      title: 'Repair In Progress',
-      description: 'Body repair work ongoing',
-      timestamp: vehicle?.bodyRepairInProgressAt,
-    },
-    {
-      status: 'BODY_REPAIR_PAINTING',
-      icon: '🎨',
-      title: 'Painting',
-      description: 'Painting and finishing',
-      timestamp: vehicle?.bodyRepairPaintingAt,
-    },
-    {
-      status: 'BODY_REPAIR_COMPLETE',
-      icon: '✨',
-      title: 'Repair Complete',
-      description: 'All work completed',
-      timestamp: vehicle?.bodyRepairCompleteAt,
-    },
-    {
-      status: 'READY_FOR_PICKUP',
-      icon: '✅',
-      title: 'Ready for Pickup',
-      description: 'Vehicle is ready to collect',
-      timestamp: vehicle?.readyAt,
-    },
-  ];
-
-  const steps = serviceType === 'BODY_REPAIR' ? bodyRepairSteps : washSteps;
 
   return (
     <View style={styles.container}>
@@ -173,7 +254,7 @@ export default function TrackProgressScreen({ navigation, route }: TrackProgress
         
         <Text style={styles.headerTitle}>Track Progress</Text>
         <Text style={styles.headerSubtitle}>
-          Real-time {serviceType === 'BODY_REPAIR' ? 'body repair' : 'wash'} status
+          Real-time service progress tracking
         </Text>
       </LinearGradient>
 
@@ -183,34 +264,112 @@ export default function TrackProgressScreen({ navigation, route }: TrackProgress
           <RefreshControl refreshing={loading} onRefresh={refetch} />
         }
       >
-        {vehicle ? (
-          <>
-            {/* Vehicle Info Card */}
-            <View style={styles.vehicleCard}>
-              <View style={styles.vehicleHeader}>
-                <Text style={styles.vehicleNumber}>{vehicle.vehicleNumber}</Text>
-                <View style={[
-                  styles.statusBadge,
-                  { backgroundColor: getStatusColor(vehicle.status) }
-                ]}>
-                  <Text style={styles.statusText}>{getStatusLabel(vehicle.status)}</Text>
-                </View>
-              </View>
-              <Text style={styles.vehicleInfo}>
-                {vehicle.vehicleType === 'CAR' ? '🚗' : '🏍️'} {vehicle.brand} {vehicle.model}
-              </Text>
-              {vehicle.worker && (
-                <Text style={styles.workerInfo}>
-                  👷 Worker: {vehicle.worker.name || vehicle.worker.mobile}
-                </Text>
-              )}
-            </View>
+        {vehiclesToShow && vehiclesToShow.length > 0 ? (
+          vehiclesToShow.map((vehicle: any) => {
+            const hasSlotServices = vehicle?.slotBooking?.services && vehicle.slotBooking.services.length > 0;
+            const serviceType = vehicle?.serviceType || 'WASH';
+            
+            const washSteps = [
+              { status: 'RECEIVED', icon: '📥', title: 'Received', description: 'Vehicle checked in', timestamp: vehicle.receivedAt },
+              { status: 'WASHING', icon: '🚿', title: 'Washing', description: 'Cleaning in progress', timestamp: vehicle.washingAt },
+              { status: 'READY_FOR_PICKUP', icon: '✅', title: 'Ready', description: 'Ready for pickup', timestamp: vehicle.readyAt },
+            ];
 
-            {/* Progress Timeline - Horizontal */}
-            <View style={styles.timelineContainer}>
-              <Text style={styles.timelineTitle}>
-                {serviceType === 'BODY_REPAIR' ? 'Body Repair Progress' : 'Wash Progress'}
-              </Text>
+            const bodyRepairSteps = [
+              { status: 'RECEIVED', icon: '📥', title: 'Received', description: 'Vehicle checked in', timestamp: vehicle.receivedAt },
+              { status: 'BODY_REPAIR_ASSESSMENT', icon: '🔍', title: 'Assessment', description: 'Damage evaluation', timestamp: vehicle.bodyRepairAssessmentAt },
+              { status: 'BODY_REPAIR_IN_PROGRESS', icon: '🔧', title: 'Repair Work', description: 'Fixing in progress', timestamp: vehicle.bodyRepairInProgressAt },
+              { status: 'BODY_REPAIR_PAINTING', icon: '🎨', title: 'Painting', description: 'Paint application', timestamp: vehicle.bodyRepairPaintingAt },
+              { status: 'BODY_REPAIR_COMPLETE', icon: '✨', title: 'Repair Complete', description: 'All work completed', timestamp: vehicle.bodyRepairCompleteAt },
+              { status: 'READY_FOR_PICKUP', icon: '✅', title: 'Ready for Pickup', description: 'Vehicle is ready to collect', timestamp: vehicle.readyAt },
+            ];
+
+            const steps = serviceType === 'BODY_REPAIR' ? bodyRepairSteps : washSteps;
+            
+            // Helper function to get step status for legacy timeline
+            const getStepStatus = (stepStatus: string) => {
+              let statusOrder: string[];
+              if (serviceType === 'BODY_REPAIR') {
+                statusOrder = [
+                  'BODY_REPAIR_ASSESSMENT',
+                  'BODY_REPAIR_IN_PROGRESS',
+                  'BODY_REPAIR_PAINTING',
+                  'BODY_REPAIR_COMPLETE',
+                  'READY_FOR_PICKUP',
+                  'DELIVERED'
+                ];
+              } else {
+                statusOrder = ['RECEIVED', 'WASHING', 'READY_FOR_PICKUP', 'DELIVERED'];
+              }
+              
+              const currentIndex = statusOrder.indexOf(vehicle.status);
+              const stepIndex = statusOrder.indexOf(stepStatus);
+              
+              if (stepIndex < currentIndex) return 'completed';
+              if (stepIndex === currentIndex) return 'active';
+              return 'pending';
+            };
+            
+            const isVehicleExpanded = expandedVehicles[vehicle.id] || false;
+            const serviceCount = vehicle.slotBooking?.services?.length || 0;
+            
+            return (
+              <View key={vehicle.id} style={styles.vehicleCard}>
+                {/* Vehicle Header - Always visible, clickable to expand/collapse */}
+                <TouchableOpacity 
+                  style={styles.vehicleHeader}
+                  onPress={() => toggleVehicle(vehicle.id)}
+                  activeOpacity={0.7}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.vehicleNumber}>{vehicle.vehicleNumber}</Text>
+                    {hasSlotServices && (
+                      <Text style={styles.vehicleServiceCount}>
+                        {serviceCount} Service{serviceCount > 1 ? 's' : ''} Booked
+                      </Text>
+                    )}
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <View style={[
+                      styles.statusBadge,
+                      { backgroundColor: getStatusColor(vehicle.status) }
+                    ]}>
+                      <Text style={styles.statusText}>{getStatusLabel(vehicle.status)}</Text>
+                    </View>
+                    <Text style={styles.accordionIcon}>{isVehicleExpanded ? '▼' : '▶'}</Text>
+                  </View>
+                </TouchableOpacity>
+
+                {/* Vehicle Details - Show when expanded */}
+                {isVehicleExpanded && (
+                  <>
+                    <View style={styles.vehicleDetails}>
+                      <Text style={styles.vehicleInfo}>
+                        {vehicle.vehicleType === 'CAR' ? '🚗' : '🏍️'} {vehicle.brand} {vehicle.model}
+                      </Text>
+                      {vehicle.worker && (
+                        <Text style={styles.workerInfo}>
+                          👷 Worker: {vehicle.worker.name || vehicle.worker.mobile}
+                        </Text>
+                      )}
+                    </View>
+
+                    {/* Show individual services if from slot booking */}
+                    {hasSlotServices ? (
+                      <View style={styles.servicesContainer}>
+                        {vehicle.slotBooking.services.map((service: any) => (
+                          <View key={service.id}>
+                            {renderServiceProgress(service)}
+                          </View>
+                        ))}
+                      </View>
+                    ) : (
+                      <>
+                    {/* Legacy Progress Timeline - Horizontal (for non-slot vehicles) */}
+                    <View style={styles.timelineContainer}>
+                      <Text style={styles.timelineTitle}>
+                        {serviceType === 'BODY_REPAIR' ? 'Body Repair Progress' : 'Wash Progress'}
+                      </Text>
               
               {/* Horizontal Steps */}
               <ScrollView 
@@ -276,8 +435,10 @@ export default function TrackProgressScreen({ navigation, route }: TrackProgress
                 })}
               </ScrollView>
             </View>
+              </>
+            )}
 
-            {/* Payment Info */}
+            {/* Payment Info - Show for all vehicles */}
             {vehicle.payment && (
               <View style={styles.paymentCard}>
                 <Text style={styles.paymentTitle}>Payment Details</Text>
@@ -330,7 +491,11 @@ export default function TrackProgressScreen({ navigation, route }: TrackProgress
                 </Text>
               </View>
             )}
-          </>
+                  </>
+                )}
+              </View>
+            );
+          })
         ) : (
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>📋</Text>
@@ -436,12 +601,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    paddingBottom: 0,
   },
   vehicleNumber: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#1F2937',
+    marginBottom: 4,
+  },
+  vehicleServiceCount: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  vehicleDetails: {
+    paddingTop: 12,
+    marginTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
   },
   statusBadge: {
     paddingHorizontal: 12,
@@ -663,14 +839,173 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   emptyButton: {
-    backgroundColor: '#667eea',
+    backgroundColor: '#7C3AED',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 12,
   },
   emptyButtonText: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  // New styles for service-based tracking
+  servicesContainer: {
+    marginTop: 8,
+  },
+  servicesTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 16,
+    paddingHorizontal: 4,
+  },
+  serviceCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  serviceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 0,
+  },
+  accordionIcon: {
+    fontSize: 16,
+    color: '#6B7280',
+    marginLeft: 8,
+  },
+  serviceIconContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  serviceIcon: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  serviceInfo: {
+    flex: 1,
+  },
+  serviceName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1F2937',
+  },
+  serviceStatusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  serviceStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  serviceSteps: {
+    marginTop: 20,
+  },
+  stepRow: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  stepDot: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    marginTop: 2,
+  },
+  stepDotCompleted: {
+    backgroundColor: '#10B981',
+  },
+  stepDotActive: {
+    backgroundColor: '#F59E0B',
+  },
+  stepDotPending: {
+    backgroundColor: '#E5E7EB',
+  },
+  stepDotIcon: {
     fontSize: 14,
+  },
+  stepContent: {
+    flex: 1,
+  },
+  stepLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 2,
+  },
+  stepLabelPending: {
+    color: '#9CA3AF',
+  },
+  stepTime: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  stepConnector: {
+    position: 'absolute',
+    left: 11,
+    top: 28,
+    width: 2,
+    height: 20,
+    backgroundColor: '#E5E7EB',
+  },
+  stepConnectorCompleted: {
+    backgroundColor: '#10B981',
+  },
+  serviceNotes: {
+    marginTop: 12,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  serviceNotesLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  serviceNotesText: {
+    fontSize: 14,
+    color: '#1F2937',
+    fontStyle: 'italic',
+  },
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  emptyButton: {
+    backgroundColor: '#7C3AED',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  emptyButtonText: {
+    color: '#fff',
+    fontSize: 16,
     fontWeight: '600',
   },
 });

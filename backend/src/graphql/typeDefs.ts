@@ -128,6 +128,8 @@ export const typeDefs = gql`
     customer: User!
     worker: User
     payment: Payment
+    center: Center
+    slotBooking: SlotBooking
     washCount: Int!
     createdAt: DateTime!
     updatedAt: DateTime!

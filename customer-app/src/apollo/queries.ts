@@ -166,6 +166,21 @@ export const MY_VEHICLES = gql`
         transactionId
         createdAt
       }
+      slotBooking {
+        id
+        carWash
+        twoWheelerWash
+        bodyRepair
+        services {
+          id
+          serviceType
+          status
+          startedAt
+          completedAt
+          notes
+          createdAt
+        }
+      }
     }
   }
 `;

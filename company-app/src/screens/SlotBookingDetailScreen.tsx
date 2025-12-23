@@ -112,12 +112,20 @@ export default function SlotBookingDetailScreen({ route, navigation }: any) {
   });
 
   const [startService] = useMutation(START_SERVICE, {
-    onCompleted: () => {
+    onCompleted: (data) => {
+      console.log('✅ Start service response:', data);
       Alert.alert('Success', 'Service started');
       refetch();
     },
     onError: (error) => {
-      Alert.alert('Error', error.message);
+      console.error('❌ Start service error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        graphQLErrors: error.graphQLErrors,
+        networkError: error.networkError,
+        extraInfo: error.extraInfo,
+      });
+      Alert.alert('Error', error.message || 'Failed to start service');
     },
   });
 
@@ -400,13 +408,20 @@ export default function SlotBookingDetailScreen({ route, navigation }: any) {
               )}
 
               <View style={styles.serviceActions}>
-                {service.status === 'BOOKED' && (
+                {service.status === 'BOOKED' && booking.status === 'VERIFIED' && (
                   <TouchableOpacity
                     style={styles.actionButton}
                     onPress={() => handleStartService(service)}
                   >
                     <Text style={styles.actionButtonText}>▶️ Start Service</Text>
                   </TouchableOpacity>
+                )}
+                {service.status === 'BOOKED' && booking.status !== 'VERIFIED' && (
+                  <View style={styles.pendingVerificationNote}>
+                    <Text style={styles.pendingVerificationText}>
+                      ⏳ Waiting for OTP verification to start service
+                    </Text>
+                  </View>
                 )}
                 {['STARTED', 'IN_PROGRESS'].includes(service.status) && (
                   <TouchableOpacity
@@ -767,5 +782,15 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     textAlign: 'center',
+  },  pendingVerificationNote: {
+    backgroundColor: '#FEF3C7',
+    padding: 12,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#F59E0B',
   },
-});
+  pendingVerificationText: {
+    color: '#92400E',
+    fontSize: 13,
+    fontWeight: '500',
+  },});
