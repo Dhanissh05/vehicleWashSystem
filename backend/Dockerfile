@@ -17,8 +17,11 @@ RUN npm ci && \
 # Copy source code
 COPY . .
 
-# Generate Prisma Client and Build TypeScript
-RUN npm run build
+# Generate Prisma Client, run cleanup, push schema, and Build TypeScript
+RUN npx prisma generate && \
+    (npx prisma db execute --file=./cleanup-duplicates.sql || true) && \
+    npx prisma db push --accept-data-loss --skip-generate && \
+    npx tsc
 
 # Remove devDependencies after build to reduce size
 RUN npm prune --production
