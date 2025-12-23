@@ -23,6 +23,7 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import SlotsScreen from './src/screens/SlotsScreen';
 import WorkerProfileScreen from './src/screens/WorkerProfileScreen';
 import SlotBookingsScreen from './src/screens/SlotBookingsScreen';
+import SlotBookingDetailScreen from './src/screens/SlotBookingDetailScreen';
 import PushNotificationScreen from './src/screens/PushNotificationScreen';
 import ManageUsersScreen from './src/screens/ManageUsersScreen';
 
@@ -150,6 +151,7 @@ function AppNavigator() {
         <Stack.Screen name="Pricing" component={PricingScreen} />
         <Stack.Screen name="Slots" component={SlotsScreen} options={{ title: 'Slot Management' }} />
         <Stack.Screen name="SlotBookings" component={SlotBookingsScreen} options={{ title: 'Slot Bookings' }} />
+        <Stack.Screen name="SlotBookingDetail" component={SlotBookingDetailScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ManageUsers" component={ManageUsersScreen} options={{ title: 'Manage Users' }} />
         <Stack.Screen name="PushNotification" component={PushNotificationScreen} options={{ title: 'Push Notification' }} />
         <Stack.Screen name="Settings" component={SettingsScreen} />

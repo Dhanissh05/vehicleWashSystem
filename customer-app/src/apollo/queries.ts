@@ -354,10 +354,27 @@ export const MY_SLOT_BOOKINGS = gql`
       otp
       status
       rejectionReason
+      cancelledByRole
+      cancelledByName
+      cancelledAt
       createdAt
       center {
         name
         address
+      }
+      services {
+        id
+        serviceType
+        status
+        startedAt
+        startedBy
+        completedAt
+        completedBy
+        cancelledAt
+        cancelledBy
+        cancelledByRole
+        cancelledByName
+        notes
       }
     }
   }
@@ -368,6 +385,27 @@ export const CANCEL_SLOT_BOOKING = gql`
     cancelSlotBooking(bookingId: $bookingId) {
       id
       status
+      cancelledByRole
+      cancelledByName
+      cancelledAt
+      services {
+        id
+        status
+        cancelledAt
+      }
+    }
+  }
+`;
+
+export const CANCEL_SERVICE = gql`
+  mutation CancelService($serviceId: ID!) {
+    cancelService(serviceId: $serviceId) {
+      id
+      status
+      cancelledAt
+      cancelledBy
+      cancelledByRole
+      cancelledByName
     }
   }
 `;

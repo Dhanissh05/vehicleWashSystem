@@ -6,12 +6,13 @@ import {
   ScrollView,
   ActivityIndicator,
   RefreshControl,
+  TouchableOpacity,
 } from 'react-native';
 import { useQuery } from '@apollo/client';
 import { MY_SLOT_BOOKINGS } from '../apollo/queries';
 import CalendarIcon from '../components/CalendarIcon';
 
-const BookedSlotsScreen = () => {
+const BookedSlotsScreen = ({ navigation }: any) => {
   const { data, loading, error, refetch } = useQuery(MY_SLOT_BOOKINGS, {
     fetchPolicy: 'network-only',
   });
@@ -96,7 +97,11 @@ const BookedSlotsScreen = () => {
         </Text>
 
         {bookings.map((booking: any) => (
-          <View key={booking.id} style={styles.bookingCard}>
+          <TouchableOpacity
+            key={booking.id}
+            style={styles.bookingCard}
+            onPress={() => navigation.navigate('SlotBookingDetail', { bookingId: booking.id })}
+          >
             {/* Header with Status */}
             <View style={styles.cardHeader}>
               <View style={styles.vehicleInfo}>
@@ -143,6 +148,15 @@ const BookedSlotsScreen = () => {
               </View>
             )}
 
+            {booking.cancelledByRole && (
+              <View style={styles.cancelledSection}>
+                <Text style={styles.cancelledLabel}>Cancelled</Text>
+                <Text style={styles.cancelledText}>
+                  By {booking.cancelledByRole} {booking.cancelledByName}
+                </Text>
+              </View>
+            )}
+
             {/* Details Table */}
             <View style={styles.detailsTable}>
               <View style={styles.tableRow}>
@@ -174,7 +188,11 @@ const BookedSlotsScreen = () => {
                 </Text>
               </View>
             </View>
-          </View>
+
+            <View style={styles.viewDetailsContainer}>
+              <Text style={styles.viewDetailsText}>Tap to view details →</Text>
+            </View>
+          </TouchableOpacity>
         ))}
       </View>
     </ScrollView>
@@ -338,6 +356,24 @@ const styles = StyleSheet.create({
     color: '#DC2626',
     fontWeight: '500',
   },
+  cancelledSection: {
+    backgroundColor: '#FEE2E2',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  cancelledLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 6,
+  },
+  cancelledText: {
+    fontSize: 14,
+    color: '#991B1B',
+    fontWeight: '500',
+  },
   detailsTable: {
     gap: 12,
   },
@@ -345,6 +381,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+  },
+  tableLabel: {
+    fontSize: 13,
+    color: '#666',
+    flex: 1,
+  },
+  tableValue: {
+    fontSize: 13,
+    color: '#1A1A1A',
+    fontWeight: '500',
+    flex: 2,
+    textAlign: 'right',
+  },
+  viewDetailsContainer: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    alignItems: 'center',
+  },
+  viewDetailsText: {
+    fontSize: 13,
+    color: '#8B5CF6',
+    fontWeight: '600',
   },
   tableLabel: {
     fontSize: 14,

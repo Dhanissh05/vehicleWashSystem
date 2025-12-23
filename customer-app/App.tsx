@@ -24,6 +24,7 @@ import AddVehicleScreen from './src/screens/AddVehicleScreen';
 import TrackProgressScreen from './src/screens/TrackProgressScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import SlotBookingScreen from './src/screens/SlotBookingScreen';
+import SlotBookingDetailScreen from './src/screens/SlotBookingDetailScreen';
 import BookedSlotsScreen from './src/screens/BookedSlotsScreen';
 import PaymentsScreen from './src/screens/PaymentsScreen';
 
@@ -180,6 +181,11 @@ function AppNavigator() {
             name="SlotBooking" 
             component={SlotBookingScreen}
             options={{ title: 'Book a Slot' }}
+          />
+          <Stack.Screen 
+            name="SlotBookingDetail" 
+            component={SlotBookingDetailScreen}
+            options={{ title: 'Slot Details' }}
           />
           <Stack.Screen 
             name="BookedSlots" 

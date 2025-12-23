@@ -39,9 +39,22 @@ const SLOT_BOOKINGS = gql`
       bodyRepair
       otp
       status
+      cancelledByRole
+      cancelledByName
+      cancelledAt
       createdAt
       center {
         name
+      }
+      services {
+        id
+        serviceType
+        status
+        startedAt
+        completedAt
+        cancelledAt
+        cancelledByRole
+        cancelledByName
       }
     }
   }
@@ -62,6 +75,42 @@ const CANCEL_SLOT_BOOKING = gql`
     cancelSlotBooking(bookingId: $bookingId) {
       id
       status
+    }
+  }
+`;
+
+const CANCEL_SLOT_BY_STAFF = gql`
+  mutation CancelSlotByStaff($bookingId: ID!) {
+    cancelSlotByStaff(bookingId: $bookingId) {
+      id
+      status
+      cancelledByRole
+      cancelledByName
+      cancelledAt
+      services {
+        id
+        status
+      }
+    }
+  }
+`;
+
+const START_SERVICE = gql`
+  mutation StartService($serviceId: ID!) {
+    startService(serviceId: $serviceId) {
+      id
+      status
+      startedAt
+    }
+  }
+`;
+
+const UPDATE_SERVICE_STATUS = gql`
+  mutation UpdateServiceStatus($serviceId: ID!, $status: SlotServiceStatus!, $notes: String) {
+    updateServiceStatus(serviceId: $serviceId, status: $status, notes: $notes) {
+      id
+      status
+      completedAt
     }
   }
 `;
@@ -187,7 +236,10 @@ export default function SlotBookingsScreen({ navigation }: any) {
     if (item.bodyRepair) services.push('🔧 Body Repair');
 
     return (
-      <View style={styles.bookingCard}>
+      <TouchableOpacity
+        style={styles.bookingCard}
+        onPress={() => navigation.navigate('SlotBookingDetail', { bookingId: item.id })}
+      >
         <View style={styles.bookingHeader}>
           <View>
             <Text style={styles.vehicleNumber}>{item.vehicleNumber}</Text>
@@ -225,19 +277,29 @@ export default function SlotBookingsScreen({ navigation }: any) {
           <View style={styles.actions}>
             <TouchableOpacity
               style={styles.verifyButton}
-              onPress={() => handleVerify(item)}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleVerify(item);
+              }}
             >
               <Text style={styles.verifyButtonText}>✓ Verify & Enter</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.cancelButton}
-              onPress={() => handleCancel(item.id)}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleCancel(item.id);
+              }}
             >
               <Text style={styles.cancelButtonText}>✕ Cancel</Text>
             </TouchableOpacity>
           </View>
         )}
-      </View>
+
+        <View style={styles.viewDetailsHint}>
+          <Text style={styles.viewDetailsText}>Tap for details →</Text>
+        </View>
+      </TouchableOpacity>
     );
   };
 
@@ -423,6 +485,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelButtonText: { color: '#FFF', fontWeight: '600', fontSize: 14 },
+  viewDetailsHint: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    alignItems: 'center',
+  },
+  viewDetailsText: {
+    fontSize: 12,
+    color: '#8B5CF6',
+    fontWeight: '600',
+  },
   emptyContainer: { alignItems: 'center', padding: 40 },
   emptyText: { fontSize: 16, color: '#999' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center' },
