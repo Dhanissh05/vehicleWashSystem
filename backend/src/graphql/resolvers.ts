@@ -2117,11 +2117,30 @@ export const resolvers = {
     },
 
     startService: async (_: any, { serviceId }: any, context: Context) => {
-      requireStaff(context);
+      console.log('🚀 startService called with serviceId:', serviceId);
+      console.log('👤 User context:', { 
+        userId: context.user?.id, 
+        role: context.user?.role,
+        name: context.user?.name,
+      });
+      
+      try {
+        requireStaff(context);
+        console.log('✅ Staff auth passed');
+      } catch (error) {
+        console.error('❌ Staff auth failed:', error);
+        throw error;
+      }
 
       const service = await context.prisma.slotService.findUnique({
         where: { id: serviceId },
       });
+
+      console.log('📋 Service found:', service ? { 
+        id: service.id, 
+        status: service.status, 
+        serviceType: service.serviceType 
+      } : 'NOT FOUND');
 
       if (!service) {
         throw new Error('Service not found');
@@ -2138,6 +2157,11 @@ export const resolvers = {
           startedAt: new Date(),
           startedBy: context.user!.id,
         },
+      });
+
+      console.log('✅ Service started successfully:', { 
+        id: updatedService.id, 
+        status: updatedService.status 
       });
 
       return updatedService;
