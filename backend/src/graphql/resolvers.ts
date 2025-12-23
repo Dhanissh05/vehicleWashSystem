@@ -1800,22 +1800,6 @@ export const resolvers = {
         throw new Error('Please select at least one service type');
       }
 
-      // Check if vehicle already has an active booking (PENDING or VERIFIED)
-      const existingBooking = await context.prisma.slotBooking.findFirst({
-        where: {
-          vehicleNumber: input.vehicleNumber.toUpperCase(),
-          status: {
-            in: ['PENDING', 'VERIFIED'],
-          },
-        },
-      });
-
-      if (existingBooking) {
-        throw new Error(
-          `This vehicle (${input.vehicleNumber}) already has an active booking. Please wait until it's processed or cancelled.`
-        );
-      }
-
       // Check if vehicle is currently being serviced (not yet delivered)
       const existingVehicle = await context.prisma.vehicle.findFirst({
         where: {
@@ -1833,6 +1817,39 @@ export const resolvers = {
         throw new Error(
           `This vehicle (${input.vehicleNumber}) is currently ${statusText}. Cannot book a new slot until the vehicle is delivered.`
         );
+      }
+
+      // Check if vehicle already has an active booking (PENDING or VERIFIED)
+      // Only check for bookings that don't have a corresponding delivered vehicle
+      const existingBooking = await context.prisma.slotBooking.findFirst({
+        where: {
+          vehicleNumber: input.vehicleNumber.toUpperCase(),
+          status: {
+            in: ['PENDING', 'VERIFIED'],
+          },
+        },
+      });
+
+      if (existingBooking) {
+        // Double-check if there's a delivered vehicle for this booking
+        // If the vehicle is delivered, allow new booking
+        const deliveredVehicle = await context.prisma.vehicle.findFirst({
+          where: {
+            vehicleNumber: input.vehicleNumber.toUpperCase(),
+            status: VehicleStatus.DELIVERED,
+          },
+          orderBy: {
+            deliveredAt: 'desc',
+          },
+          take: 1,
+        });
+
+        // If no delivered vehicle or booking was created after delivery, block new booking
+        if (!deliveredVehicle || new Date(existingBooking.createdAt) > new Date(deliveredVehicle.deliveredAt || 0)) {
+          throw new Error(
+            `This vehicle (${input.vehicleNumber}) already has an active booking. Please wait until it's processed or cancelled.`
+          );
+        }
       }
 
       // Check slot availability before creating booking
