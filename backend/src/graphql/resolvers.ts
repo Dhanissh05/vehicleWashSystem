@@ -1923,7 +1923,9 @@ export const resolvers = {
         },
       });
 
-      const serviceType = booking.bodyRepair ? ServiceType.BODY_REPAIR : ServiceType.WASH;
+      const serviceType = (booking.carWash || booking.twoWheelerWash) 
+        ? ServiceType.WASH 
+        : ServiceType.BODY_REPAIR;
 
       const vehicle = await context.prisma.vehicle.create({
         data: {
