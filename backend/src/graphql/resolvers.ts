@@ -64,6 +64,7 @@ interface Context {
     id: string;
     mobile: string;
     role: string;
+    name?: string;
   };
   prisma: PrismaClient;
 }

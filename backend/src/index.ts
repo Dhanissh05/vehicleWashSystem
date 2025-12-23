@@ -20,7 +20,7 @@ dotenv.config();
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors() as any);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
@@ -45,6 +45,7 @@ interface Context {
     id: string;
     mobile: string;
     role: string;
+    name?: string;
   };
   prisma: PrismaClient;
 }
@@ -73,7 +74,7 @@ const startServer = async () => {
 
   app.use(
     '/graphql',
-    cors(),
+    cors() as any,
     express.json({ limit: '10mb' }),
     expressMiddleware(apolloServer, {
       context: async ({ req }): Promise<Context> => {
