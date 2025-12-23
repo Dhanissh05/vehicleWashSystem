@@ -126,7 +126,7 @@ model Vehicle {
   centerId        String
   
   slotBooking     SlotBooking?    @relation(fields: [slotBookingId], references: [id])
-  slotBookingId   String?         @unique
+  slotBookingId   String?
   
   payment         Payment?
   
