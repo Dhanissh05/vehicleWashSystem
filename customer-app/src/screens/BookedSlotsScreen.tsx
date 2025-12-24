@@ -9,13 +9,29 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useQuery } from '@apollo/client';
+import { useFocusEffect } from '@react-navigation/native';
 import { MY_SLOT_BOOKINGS } from '../apollo/queries';
 import CalendarIcon from '../components/CalendarIcon';
 
 const BookedSlotsScreen = ({ navigation }: any) => {
+  const [isScreenFocused, setIsScreenFocused] = React.useState(true);
+  
   const { data, loading, error, refetch } = useQuery(MY_SLOT_BOOKINGS, {
-    fetchPolicy: 'network-only',
+    fetchPolicy: 'cache-and-network',
+    pollInterval: isScreenFocused ? 10000 : 0, // Poll only when screen is focused
   });
+
+  // Track screen focus state for smart polling
+  useFocusEffect(
+    React.useCallback(() => {
+      setIsScreenFocused(true);
+      refetch();
+      
+      return () => {
+        setIsScreenFocused(false);
+      };
+    }, [refetch])
+  );
 
   const getStatusColor = (status: string) => {
     switch (status) {

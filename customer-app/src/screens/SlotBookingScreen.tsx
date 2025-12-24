@@ -18,9 +18,11 @@ import { Picker } from '@react-native-picker/picker';
 import { useMutation, useQuery } from '@apollo/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
+import { useFocusEffect } from '@react-navigation/native';
 import { CREATE_SLOT_BOOKING, CENTERS, MY_SLOT_BOOKINGS, MY_VEHICLES } from '../apollo/queries';
 
 const SlotBookingScreen = ({ navigation }: any) => {
+  const [isScreenFocused, setIsScreenFocused] = useState(true);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [vehicleNumber, setVehicleNumber] = useState('');
   const [vehicleType, setVehicleType] = useState<'CAR' | 'TWO_WHEELER'>('CAR');
@@ -38,14 +40,28 @@ const SlotBookingScreen = ({ navigation }: any) => {
   const [bookingOtp, setBookingOtp] = useState('');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
-  const { data: centersData, loading: centersLoading, error: centersError } = useQuery(CENTERS, {
+  const { data: centersData, loading: centersLoading, error: centersError, refetch: refetchCenters } = useQuery(CENTERS, {
     fetchPolicy: 'cache-and-network',
+    pollInterval: isScreenFocused ? 10000 : 0, // Smart polling - only when screen is focused
     notifyOnNetworkStatusChange: false,
   });
   
   const { data: vehiclesData, loading: vehiclesLoading } = useQuery(MY_VEHICLES, {
     fetchPolicy: 'cache-and-network',
   });
+
+  // Track screen focus state for smart polling
+  useFocusEffect(
+    React.useCallback(() => {
+      setIsScreenFocused(true);
+      refetchCenters();
+      
+      return () => {
+        setIsScreenFocused(false);
+      };
+    }, [refetchCenters])
+  );
+
   const [createBooking, { loading }] = useMutation(CREATE_SLOT_BOOKING, {
     refetchQueries: [
       { query: CENTERS },

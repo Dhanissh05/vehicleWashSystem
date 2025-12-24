@@ -18,13 +18,17 @@ import { OnlinePaymentModal } from '../components/OnlinePaymentModal';
 import { Audio } from 'expo-av';
 
 export default function HomeScreen({ navigation }: any) {
+  const [isScreenFocused, setIsScreenFocused] = React.useState(true);
+  
   const { data, loading, refetch, error } = useQuery(MY_VEHICLES, {
-    fetchPolicy: 'network-only', // Always fetch from network, not cache
-    pollInterval: 5000, // Poll every 5 seconds for real-time updates
+    fetchPolicy: 'cache-and-network',
+    pollInterval: isScreenFocused ? 10000 : 0, // Poll only when screen is focused
+    notifyOnNetworkStatusChange: false,
   });
   const { data: centerData, refetch: refetchCenter, error: centerError } = useQuery(CENTERS, {
-    fetchPolicy: 'network-only', // Always fetch from network, not cache
-    pollInterval: 3000, // Poll every 3 seconds for slot updates
+    fetchPolicy: 'cache-and-network',
+    pollInterval: isScreenFocused ? 10000 : 0, // Poll only when screen is focused
+    notifyOnNetworkStatusChange: false,
   });
   const { data: pricingData } = useQuery(PRICING);
   const { data: configData } = useQuery(SYSTEM_CONFIG, {
@@ -42,6 +46,19 @@ export default function HomeScreen({ navigation }: any) {
 
   const slotBookingEnabled = configData?.systemConfig?.value === 'true';
 
+  // Track screen focus state for smart polling
+  useFocusEffect(
+    React.useCallback(() => {
+      setIsScreenFocused(true);
+      refetch();
+      refetchCenter();
+      
+      return () => {
+        setIsScreenFocused(false);
+      };
+    }, [refetch, refetchCenter])
+  );
+
   // Play sound and show payment modal when vehicle becomes READY_FOR_PICKUP
   React.useEffect(() => {
     const playReadySound = async () => {
@@ -58,7 +75,7 @@ export default function HomeScreen({ navigation }: any) {
         try {
           console.log('📂 Loading notification.mp3...');
           const { sound } = await Audio.Sound.createAsync(
-            require('../assets/notification.mp3')
+            require('../../assets/notification.mp3')
           );
           console.log('▶️ Playing sound...');
           await sound.playAsync();
@@ -73,12 +90,16 @@ export default function HomeScreen({ navigation }: any) {
           });
         } catch (soundError) {
           console.log('❌ Notification sound error:', soundError);
-          console.log('Please ensure notification.mp3 exists in customer-app/assets/');
         }
       } catch (error) {
         console.log('❌ Error setting audio mode:', error);
       }
     };
+
+    console.log('🔍 Checking for ready vehicles...', {
+      hasData: !!data?.myVehicles,
+      vehicleCount: data?.myVehicles?.length || 0,
+    });
 
     if (data?.myVehicles) {
       // Find vehicles that just became READY_FOR_PICKUP and haven't played sound yet
@@ -86,8 +107,16 @@ export default function HomeScreen({ navigation }: any) {
         (v: any) => v.status === 'READY_FOR_PICKUP' && !playedReadyVehicles.current.has(v.id)
       );
 
+      console.log('📊 Vehicle status check:', {
+        total: data.myVehicles.length,
+        readyForPickup: data.myVehicles.filter((v: any) => v.status === 'READY_FOR_PICKUP').length,
+        newReadyVehicles: readyVehicles.length,
+        playedBefore: Array.from(playedReadyVehicles.current),
+      });
+
       if (readyVehicles.length > 0) {
         console.log(`🚗 ${readyVehicles.length} vehicle(s) ready for pickup!`);
+        console.log('Ready vehicles:', readyVehicles.map((v: any) => ({ id: v.id, number: v.vehicleNumber })));
         
         // Play sound once for ready vehicles
         playReadySound();
