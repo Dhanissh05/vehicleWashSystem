@@ -233,7 +233,7 @@ model SlotBooking {
   centerId          String
   center            Center    @relation(fields: [centerId], references: [id])
   services          SlotService[]
-  vehicle           Vehicle?
+  vehicles          Vehicle[]
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
