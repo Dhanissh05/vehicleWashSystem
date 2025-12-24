@@ -40,9 +40,14 @@ COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nodejs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nodejs:nodejs /app/package*.json ./
+COPY --from=builder --chown=nodejs:nodejs /app/cleanup-duplicates.sql ./
+COPY --from=builder --chown=nodejs:nodejs /app/start.sh ./
 
 # Generate Prisma Client in production stage
 RUN npx prisma generate
+
+# Make start script executable
+RUN chmod +x start.sh
 
 # Create uploads directory
 RUN mkdir -p uploads/logo uploads/payment && \
@@ -56,4 +61,4 @@ EXPOSE 4000
 
 # Start application with dumb-init
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "dist/index.js"]
+CMD ["sh", "start.sh"]
