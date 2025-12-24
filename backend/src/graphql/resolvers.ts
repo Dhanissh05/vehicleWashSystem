@@ -2071,6 +2071,12 @@ export const resolvers = {
         },
       });
 
+      // Clear vehicle's slotBookingId to allow re-entry
+      await context.prisma.vehicle.updateMany({
+        where: { slotBookingId: bookingId },
+        data: { slotBookingId: null },
+      });
+
       const updatedBooking = await context.prisma.slotBooking.update({
         where: { id: bookingId },
         data: { 
@@ -2149,6 +2155,12 @@ export const resolvers = {
           cancelledByRole: context.user!.role,
           cancelledByName: context.user!.name || 'Staff',
         },
+      });
+
+      // Clear vehicle's slotBookingId to allow re-entry
+      await context.prisma.vehicle.updateMany({
+        where: { slotBookingId: bookingId },
+        data: { slotBookingId: null },
       });
 
       const updatedBooking = await context.prisma.slotBooking.update({
