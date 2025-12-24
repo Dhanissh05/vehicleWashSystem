@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { useVersionChecker } from './src/hooks/useVersionChecker';
 import UpdateChecker from './src/components/UpdateChecker';
+import BookingNotificationListener from './src/components/BookingNotificationListener';
 
 // Screens
 import LoginScreen from './src/screens/LoginScreen';
@@ -165,6 +166,7 @@ export default function App() {
     <ApolloProvider client={apolloClient}>
       <AppNavigator />
       <UpdateChecker />
+      <BookingNotificationListener />
     </ApolloProvider>
   );
 }

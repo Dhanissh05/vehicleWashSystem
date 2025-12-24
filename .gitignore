@@ -24,3 +24,8 @@ build
 
 # HTML strategy files
 PRICING_STRATEGY.html
+
+# Documentation files - setup guides
+PUSH_NOTIFICATION_FIX.md
+SOUND_NOTIFICATION_SETUP.md
+**/SOUND_SETUP.md

@@ -32,14 +32,17 @@
       [
         "expo-notifications",
         {
-          "color": "#ffffff"
+          "icon": "./assets/icon.png",
+          "color": "#ffffff",
+          "sounds": ["./assets/notification.mp3"]
         }
       ],
       [
         "expo-build-properties",
         {
           "android": {
-            "newArchEnabled": false
+            "newArchEnabled": false,
+            "googleServicesFile": "./google-services.json"
           }
         }
       ]

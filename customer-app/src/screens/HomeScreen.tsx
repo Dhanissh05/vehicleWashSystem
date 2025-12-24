@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,10 +11,11 @@ import {
 import { useQuery } from '@apollo/client';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { MY_VEHICLES, CENTERS, PRICING } from '../apollo/queries';
+import { MY_VEHICLES, CENTERS, PRICING, SYSTEM_CONFIG } from '../apollo/queries';
 import MenuModal from '../components/CustomDrawer';
 import { PaymentMethodModal } from '../components/PaymentMethodModal';
 import { OnlinePaymentModal } from '../components/OnlinePaymentModal';
+import { Audio } from 'expo-av';
 
 export default function HomeScreen({ navigation }: any) {
   const { data, loading, refetch, error } = useQuery(MY_VEHICLES, {
@@ -26,6 +27,10 @@ export default function HomeScreen({ navigation }: any) {
     pollInterval: 3000, // Poll every 3 seconds for slot updates
   });
   const { data: pricingData } = useQuery(PRICING);
+  const { data: configData } = useQuery(SYSTEM_CONFIG, {
+    variables: { key: 'ENABLE_SLOT_BOOKING' },
+    fetchPolicy: 'network-only',
+  });
   
   const [userName, setUserName] = useState('');
   const [menuVisible, setMenuVisible] = useState(false);
@@ -33,10 +38,79 @@ export default function HomeScreen({ navigation }: any) {
   const [onlinePaymentModalVisible, setOnlinePaymentModalVisible] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
   const [selectedPaymentId, setSelectedPaymentId] = useState<string>('');
+  const playedReadyVehicles = useRef<Set<string>>(new Set());
 
-  // Check for vehicles needing payment
+  const slotBookingEnabled = configData?.systemConfig?.value === 'true';
+
+  // Play sound and show payment modal when vehicle becomes READY_FOR_PICKUP
   React.useEffect(() => {
+    const playReadySound = async () => {
+      console.log('🔊 Playing ready for pickup notification sound...');
+      try {
+        // Configure audio mode
+        await Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+          shouldDuckAndroid: true,
+        });
+        
+        // Try to load and play the notification sound
+        try {
+          console.log('📂 Loading notification.mp3...');
+          const { sound } = await Audio.Sound.createAsync(
+            require('../assets/notification.mp3')
+          );
+          console.log('▶️ Playing sound...');
+          await sound.playAsync();
+          console.log('✅ Sound played successfully!');
+          
+          // Unload sound after it finishes playing
+          sound.setOnPlaybackStatusUpdate((status: any) => {
+            if (status.didJustFinish) {
+              console.log('🔚 Sound finished, unloading...');
+              sound.unloadAsync();
+            }
+          });
+        } catch (soundError) {
+          console.log('❌ Notification sound error:', soundError);
+          console.log('Please ensure notification.mp3 exists in customer-app/assets/');
+        }
+      } catch (error) {
+        console.log('❌ Error setting audio mode:', error);
+      }
+    };
+
     if (data?.myVehicles) {
+      // Find vehicles that just became READY_FOR_PICKUP and haven't played sound yet
+      const readyVehicles = data.myVehicles.filter(
+        (v: any) => v.status === 'READY_FOR_PICKUP' && !playedReadyVehicles.current.has(v.id)
+      );
+
+      if (readyVehicles.length > 0) {
+        console.log(`🚗 ${readyVehicles.length} vehicle(s) ready for pickup!`);
+        
+        // Play sound once for ready vehicles
+        playReadySound();
+        
+        // Mark these vehicles as having played sound
+        readyVehicles.forEach((v: any) => {
+          playedReadyVehicles.current.add(v.id);
+        });
+      }
+
+      // Clean up tracking for vehicles that are no longer READY_FOR_PICKUP
+      const currentReadyIds = new Set(
+        data.myVehicles
+          .filter((v: any) => v.status === 'READY_FOR_PICKUP')
+          .map((v: any) => v.id)
+      );
+      playedReadyVehicles.current.forEach((id) => {
+        if (!currentReadyIds.has(id)) {
+          playedReadyVehicles.current.delete(id);
+        }
+      });
+
+      // Show payment modal for ready vehicles without payment
       const readyVehicle = data.myVehicles.find(
         (v: any) => v.status === 'READY_FOR_PICKUP' && !v.payment
       );

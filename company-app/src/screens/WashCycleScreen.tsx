@@ -59,6 +59,11 @@ const GET_ACTIVE_VEHICLES = gql`
           startedAt
           startedBy
           completedAt
+          completedBy
+          cancelledAt
+          cancelledBy
+          cancelledByRole
+          cancelledByName
           notes
         }
       }
@@ -179,7 +184,7 @@ export default function WashCycleScreen({ navigation }: any) {
   };
 
   const getStatusOptions = (currentStatus: string) => {
-    // Allow both forward and backward movement
+    // Only allow forward movement in the workflow
     const allStatuses = ['RECEIVED', 'WASHING', 'READY_FOR_PICKUP', 'DELIVERED'];
     const currentIndex = allStatuses.indexOf(currentStatus);
     
@@ -187,12 +192,7 @@ export default function WashCycleScreen({ navigation }: any) {
     
     const options = [];
     
-    // Add previous status (if exists)
-    if (currentIndex > 0) {
-      options.push(allStatuses[currentIndex - 1]);
-    }
-    
-    // Add next status (if exists)
+    // Only add next status (forward movement only)
     if (currentIndex < allStatuses.length - 1) {
       options.push(allStatuses[currentIndex + 1]);
     }
@@ -203,7 +203,7 @@ export default function WashCycleScreen({ navigation }: any) {
   const handleOpenModal = (vehicle: any) => {
     setSelectedVehicle(vehicle);
     setNotes('');
-    const statusOptions = getStatusOptions(vehicle.status);
+    const statusOptions = getStatusOptions(vehicle.status) || [];
     if (statusOptions.length > 0) {
       setSelectedStatus(statusOptions[0]);
     }
@@ -294,8 +294,12 @@ export default function WashCycleScreen({ navigation }: any) {
   };
 
   const renderVehicle = ({ item }: any) => {
-    const statusOptions = getStatusOptions(item.status);
-    const canUpdate = statusOptions.length > 0 && item.status !== 'DELIVERED';
+    const statusOptions = getStatusOptions(item.status) || [];
+    // Hide vehicle status update for slot booking vehicles with services, 
+    // EXCEPT when status is READY_FOR_PICKUP (allow manual delivery confirmation)
+    const hasSlotServices = item.slotBooking?.services && item.slotBooking.services.length > 0;
+    const isReadyForPickup = item.status === 'READY_FOR_PICKUP';
+    const canUpdate = (!hasSlotServices || isReadyForPickup) && statusOptions.length > 0 && item.status !== 'DELIVERED';
 
     return (
       <TouchableOpacity
@@ -332,7 +336,16 @@ export default function WashCycleScreen({ navigation }: any) {
           {item.slotBooking?.services && item.slotBooking.services.length > 0 && (
             <View style={styles.servicesSection}>
               <Text style={styles.servicesTitle}>Services:</Text>
-              {item.slotBooking.services.map((service: any) => (
+              {(() => {
+                // Check if any service is currently in progress
+                const hasActiveService = item.slotBooking.services.some(
+                  (s: any) => ['STARTED', 'IN_PROGRESS'].includes(s.status)
+                );
+                
+                return item.slotBooking.services.map((service: any) => {
+                  const canStartThisService = service.status === 'BOOKED' && !hasActiveService;
+                  
+                  return (
                 <View key={service.id} style={styles.serviceItem}>
                   <View style={styles.serviceHeader}>
                     <Text style={styles.serviceName}>
@@ -346,16 +359,28 @@ export default function WashCycleScreen({ navigation }: any) {
                       service.status === 'STARTED' && styles.serviceStarted,
                       service.status === 'IN_PROGRESS' && styles.serviceInProgress,
                       service.status === 'COMPLETED' && styles.serviceCompleted,
+                      service.status === 'CANCELLED' && styles.serviceCancelled,
                     ]}>
                       <Text style={styles.serviceStatusText}>{service.status}</Text>
                     </View>
                   </View>
+                  {service.status === 'CANCELLED' && service.cancelledByName && (
+                    <Text style={styles.cancelledInfo}>
+                      Cancelled by {service.cancelledByName} on {new Date(service.cancelledAt).toLocaleString()}
+                    </Text>
+                  )}
                   {service.status === 'BOOKED' && (
                     <TouchableOpacity
-                      style={styles.startServiceButton}
-                      onPress={() => handleStartService(service)}
+                      style={[
+                        styles.startServiceButton,
+                        !canStartThisService && styles.startServiceButtonDisabled
+                      ]}
+                      onPress={() => canStartThisService && handleStartService(service)}
+                      disabled={!canStartThisService}
                     >
-                      <Text style={styles.startServiceButtonText}>▶ Start Service</Text>
+                      <Text style={styles.startServiceButtonText}>
+                        {hasActiveService ? '⏳ Wait for current service' : '▶ Start Service'}
+                      </Text>
                     </TouchableOpacity>
                   )}
                   {(service.status === 'STARTED' || service.status === 'IN_PROGRESS') && (
@@ -372,7 +397,9 @@ export default function WashCycleScreen({ navigation }: any) {
                     </Text>
                   )}
                 </View>
-              ))}
+                );
+                });
+              })()}
             </View>
           )}
 
@@ -427,6 +454,14 @@ export default function WashCycleScreen({ navigation }: any) {
     (v: any) => {
       // Exclude delivered vehicles
       if (v.status === 'DELIVERED') return false;
+      
+      // Exclude vehicles with completely cancelled slot bookings
+      if (v.slotBooking?.status === 'CANCELLED') {
+        const allServicesCancelled = v.slotBooking.services?.every(
+          (s: any) => s.status === 'CANCELLED'
+        );
+        if (allServicesCancelled) return false;
+      }
       
       // Include all vehicles that have a slot booking (new system)
       if (v.slotBooking) return true;
@@ -614,7 +649,15 @@ export default function WashCycleScreen({ navigation }: any) {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Update Service Status</Text>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Update Service Status</Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setServiceModalVisible(false)}
+              >
+                <Text style={styles.closeButtonText}>✕</Text>
+              </TouchableOpacity>
+            </View>
 
             {selectedService && (
               <>
@@ -808,12 +851,35 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 24,
   },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    position: 'relative',
+  },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#1F2937',
-    marginBottom: 16,
+    flex: 1,
     textAlign: 'center',
+  },
+  closeButton: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeButtonText: {
+    fontSize: 20,
+    color: '#6B7280',
+    fontWeight: 'bold',
   },
   modalVehicleInfo: {
     alignItems: 'center',
@@ -916,29 +982,33 @@ const styles = StyleSheet.create({
   modalButtons: {
     flexDirection: 'row',
     gap: 12,
+    marginTop: 8,
   },
   cancelButton: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderRadius: 8,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: '#D1D5DB',
+    backgroundColor: '#fff',
     alignItems: 'center',
   },
   cancelButtonText: {
     color: '#6B7280',
-    fontWeight: '600',
+    fontWeight: '700',
+    fontSize: 15,
   },
   confirmButton: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderRadius: 8,
     backgroundColor: '#8B5CF6',
     alignItems: 'center',
   },
   confirmButtonText: {
     color: '#fff',
-    fontWeight: '600',
+    fontWeight: '700',
+    fontSize: 15,
   },
   paymentBadge: {
     paddingHorizontal: 10,
@@ -1020,10 +1090,19 @@ const styles = StyleSheet.create({
   serviceCompleted: {
     backgroundColor: '#D1FAE5',
   },
+  serviceCancelled: {
+    backgroundColor: '#FEE2E2',
+  },
   serviceStatusText: {
     fontSize: 11,
     fontWeight: '600',
     color: '#374151',
+  },
+  cancelledInfo: {
+    fontSize: 12,
+    color: '#DC2626',
+    fontStyle: 'italic',
+    marginTop: 4,
   },
   startServiceButton: {
     backgroundColor: '#3B82F6',
@@ -1031,6 +1110,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 6,
     alignItems: 'center',
+  },
+  startServiceButtonDisabled: {
+    backgroundColor: '#9CA3AF',
+    opacity: 0.6,
   },
   startServiceButtonText: {
     color: '#fff',

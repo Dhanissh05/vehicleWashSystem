@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   Switch,
 } from 'react-native';
 import { useQuery, useMutation, gql } from '@apollo/client';
+import { Audio } from 'expo-av';
 
 const GET_CENTER = gql`
   query GetCenter {
@@ -134,15 +135,84 @@ const UPDATE_SYSTEM_CONFIG = gql`
 `;
 
 export default function SlotBookingsScreen({ navigation }: any) {
-  const [filter, setFilter] = useState<'PENDING' | 'ALL'>('PENDING');
+  const [filter, setFilter] = useState<'PENDING' | 'ALL'>('ALL');
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [otpInput, setOtpInput] = useState('');
+  const playedBookingIds = useRef<Set<string>>(new Set());
 
   const { data, loading, refetch } = useQuery(SLOT_BOOKINGS, {
     variables: { status: filter === 'PENDING' ? 'PENDING' : null },
     fetchPolicy: 'network-only',
+    pollInterval: 5000, // Poll every 5 seconds for new bookings
   });
+
+  // Play sound when new booking arrives
+  useEffect(() => {
+    const playNewBookingSound = async () => {
+      console.log('🔊 Playing notification sound for new booking...');
+      try {
+        // Configure audio mode
+        await Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+          shouldDuckAndroid: true,
+        });
+        
+        // Try to load and play the notification sound
+        try {
+          console.log('📂 Loading notification.mp3...');
+          const { sound } = await Audio.Sound.createAsync(
+            require('../../assets/notification.mp3')
+          );
+          console.log('▶️ Playing sound...');
+          await sound.playAsync();
+          console.log('✅ Sound played successfully!');
+          
+          // Unload sound after it finishes playing
+          sound.setOnPlaybackStatusUpdate((status: any) => {
+            if (status.didJustFinish) {
+              console.log('🔚 Sound finished, unloading...');
+              sound.unloadAsync();
+            }
+          });
+        } catch (soundError) {
+          console.log('❌ Notification sound error:', soundError);
+          console.log('Please ensure notification.mp3 exists in company-app/assets/');
+        }
+      } catch (error) {
+        console.log('❌ Error setting audio mode:', error);
+      }
+    };
+
+    if (data?.slotBookings) {
+      const pendingBookings = data.slotBookings.filter((b: any) => b.status === 'PENDING');
+      
+      // Check for new bookings that haven't played sound yet
+      const newBookings = pendingBookings.filter((b: any) => !playedBookingIds.current.has(b.id));
+      
+      if (newBookings.length > 0) {
+        console.log(`🆕 ${newBookings.length} new booking(s) detected!`);
+        
+        // Play sound once for new bookings
+        playNewBookingSound();
+        
+        // Mark these bookings as played
+        newBookings.forEach((b: any) => {
+          playedBookingIds.current.add(b.id);
+        });
+      }
+      
+      // Clean up tracking for bookings that are no longer pending
+      // This prevents the Set from growing indefinitely
+      const currentPendingIds = new Set(pendingBookings.map((b: any) => b.id));
+      playedBookingIds.current.forEach((id) => {
+        if (!currentPendingIds.has(id)) {
+          playedBookingIds.current.delete(id);
+        }
+      });
+    }
+  }, [data]);
 
   const { data: configData, refetch: refetchConfig } = useQuery(GET_SYSTEM_CONFIG, {
     variables: { key: 'ENABLE_SLOT_BOOKING' },

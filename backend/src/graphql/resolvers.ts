@@ -1114,6 +1114,26 @@ export const resolvers = {
     updateVehicleStatus: async (_: any, { input }: any, context: Context) => {
       const user = requireStaff(context);
       
+      // Prevent marking as DELIVERED without payment confirmation
+      if (input.status === VehicleStatus.DELIVERED) {
+        const vehicle = await context.prisma.vehicle.findUnique({
+          where: { id: input.vehicleId },
+          include: { payment: true },
+        });
+
+        if (!vehicle) {
+          throw new Error('Vehicle not found');
+        }
+
+        if (!vehicle.payment) {
+          throw new Error('Payment has not been initiated for this vehicle. Cannot mark as delivered.');
+        }
+
+        if (vehicle.payment.status !== 'PAID') {
+          throw new Error(`Payment status is "${vehicle.payment.status}". Payment must be confirmed before marking as delivered.`);
+        }
+      }
+      
       const updateData: any = {
         status: input.status,
         ...(input.notes && { notes: input.notes }),
@@ -2236,6 +2256,13 @@ export const resolvers = {
 
       const service = await context.prisma.slotService.findUnique({
         where: { id: serviceId },
+        include: {
+          slotBooking: {
+            include: {
+              services: true,
+            },
+          },
+        },
       });
 
       if (!service) {
@@ -2260,6 +2287,62 @@ export const resolvers = {
         where: { id: serviceId },
         data: updateData,
       });
+
+      // Auto-update vehicle status to READY_FOR_PICKUP when all non-cancelled services are completed
+      if (status === 'COMPLETED' && service.slotBooking) {
+        const allServices = service.slotBooking.services;
+        const allNonCancelledCompleted = allServices.every(
+          (s: any) => s.id === serviceId ? true : (s.status === 'COMPLETED' || s.status === 'CANCELLED')
+        );
+
+        if (allNonCancelledCompleted) {
+          // Find the vehicle associated with this slot booking
+          const vehicle = await context.prisma.vehicle.findFirst({
+            where: {
+              slotBookingId: service.slotBookingId,
+            },
+            include: {
+              customer: true,
+              center: true,
+              payment: true,
+            },
+          });
+
+          if (vehicle && vehicle.status !== 'READY_FOR_PICKUP' && vehicle.status !== 'DELIVERED') {
+            const amount = vehicle.payment?.amount || 0;
+            
+            await context.prisma.vehicle.update({
+              where: { id: vehicle.id },
+              data: {
+                status: 'READY_FOR_PICKUP',
+                readyAt: new Date(),
+              },
+            });
+            
+            console.log(`✅ Auto-updated vehicle ${vehicle.vehicleNumber} to READY_FOR_PICKUP`);
+            
+            // Send SMS notification to customer
+            if (vehicle.customer.name && vehicle.center.name) {
+              await sendVehicleReadySms(
+                vehicle.customer.mobile,
+                vehicle.customer.name,
+                vehicle.vehicleNumber,
+                vehicle.center.name,
+                amount
+              );
+            }
+
+            // Send push notification if FCM token available
+            if (vehicle.customer.fcmToken) {
+              await sendVehicleReadyNotification(
+                vehicle.customer.fcmToken,
+                vehicle.vehicleNumber,
+                amount
+              );
+            }
+          }
+        }
+      }
 
       return updatedService;
     },
@@ -2350,6 +2433,63 @@ export const resolvers = {
           cancelledByName: context.user!.name || 'User',
         },
       });
+
+      // Auto-update vehicle status to READY_FOR_PICKUP if all remaining services are completed
+      const allServices = await context.prisma.slotService.findMany({
+        where: { slotBookingId: service.slotBookingId },
+      });
+
+      const allNonCancelledCompleted = allServices.every(
+        (s: any) => s.status === 'COMPLETED' || s.status === 'CANCELLED'
+      );
+
+      if (allNonCancelledCompleted) {
+        // Find the vehicle associated with this slot booking
+        const vehicle = await context.prisma.vehicle.findFirst({
+          where: {
+            slotBookingId: service.slotBookingId,
+          },
+          include: {
+            customer: true,
+            center: true,
+            payment: true,
+          },
+        });
+
+        if (vehicle && vehicle.status !== 'READY_FOR_PICKUP' && vehicle.status !== 'DELIVERED') {
+          const amount = vehicle.payment?.amount || 0;
+          
+          await context.prisma.vehicle.update({
+            where: { id: vehicle.id },
+            data: {
+              status: 'READY_FOR_PICKUP',
+              readyAt: new Date(),
+            },
+          });
+          
+          console.log(`✅ Auto-updated vehicle ${vehicle.vehicleNumber} to READY_FOR_PICKUP after service cancellation`);
+          
+          // Send SMS notification to customer
+          if (vehicle.customer.name && vehicle.center.name) {
+            await sendVehicleReadySms(
+              vehicle.customer.mobile,
+              vehicle.customer.name,
+              vehicle.vehicleNumber,
+              vehicle.center.name,
+              amount
+            );
+          }
+
+          // Send push notification if FCM token available
+          if (vehicle.customer.fcmToken) {
+            await sendVehicleReadyNotification(
+              vehicle.customer.fcmToken,
+              vehicle.vehicleNumber,
+              amount
+            );
+          }
+        }
+      }
 
       return updatedService;
     },
