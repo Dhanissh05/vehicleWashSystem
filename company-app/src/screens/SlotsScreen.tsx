@@ -80,6 +80,26 @@ export default function SlotsScreen() {
       return;
     }
 
+    // Check if new slot count is less than currently used slots
+    const usedSlotsTwoWheeler = center.dailySlotsTwoWheeler - center.availableSlotsTwoWheeler;
+    const usedSlotsCar = center.dailySlotsCar - center.availableSlotsCar;
+
+    if (slotsTwoWheeler < usedSlotsTwoWheeler) {
+      Alert.alert(
+        'Cannot Update',
+        `Two-wheeler slots cannot be set to ${slotsTwoWheeler} because ${usedSlotsTwoWheeler} ${usedSlotsTwoWheeler === 1 ? 'slot is' : 'slots are'} currently in use. Minimum: ${usedSlotsTwoWheeler}`
+      );
+      return;
+    }
+
+    if (slotsCar < usedSlotsCar) {
+      Alert.alert(
+        'Cannot Update',
+        `Car slots cannot be set to ${slotsCar} because ${usedSlotsCar} ${usedSlotsCar === 1 ? 'slot is' : 'slots are'} currently in use. Minimum: ${usedSlotsCar}`
+      );
+      return;
+    }
+
     Alert.alert(
       'Confirm Update',
       `Update slots to:\nTwo-Wheeler: ${slotsTwoWheeler}${slotsTwoWheeler === 0 ? ' (CLOSED)' : ''}\nCar: ${slotsCar}${slotsCar === 0 ? ' (CLOSED)' : ''}\n\nThis will reset available slots. Continue?`,

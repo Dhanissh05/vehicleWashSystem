@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,11 +13,12 @@ import {
 } from 'react-native';
 import { useQuery, useMutation } from '@apollo/client';
 import { gql } from '@apollo/client';
+import { useFocusEffect } from '@react-navigation/native';
 import { ManualPaymentModal } from '../components/ManualPaymentModal';
 
 const GET_ACTIVE_VEHICLES = gql`
   query GetActiveVehicles {
-    vehicles(limit: 100) {
+    vehicles(limit: 50) {
       id
       vehicleNumber
       vehicleType
@@ -110,16 +111,39 @@ export default function WashCycleScreen({ navigation }: any) {
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [notes, setNotes] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
-  const { data, loading, refetch, error } = useQuery(GET_ACTIVE_VEHICLES, {
+  const { data, loading, refetch } = useQuery(GET_ACTIVE_VEHICLES, {
     fetchPolicy: 'network-only',
-    onError: (err) => {
-      console.error('❌ GraphQL Query Error:', err);
-      console.error('❌ Error message:', err.message);
-      console.error('❌ Network error:', err.networkError);
-      console.error('❌ GraphQL errors:', err.graphQLErrors);
-    },
+    nextFetchPolicy: 'cache-first',
+    pollInterval: 5000, // Poll every 5 seconds for real-time updates
   });
+
+  // Auto-refetch when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const [updateStatus, { loading: updating }] = useMutation(UPDATE_VEHICLE_STATUS, {
     refetchQueries: [{ query: GET_ACTIVE_VEHICLES }],
@@ -449,70 +473,35 @@ export default function WashCycleScreen({ navigation }: any) {
   };
 
   // Filter active vehicles (exclude DELIVERED)
-  // Show vehicles from slot bookings (new system) or WASH service vehicles (old system)
-  const activeVehicles = data?.vehicles?.filter(
-    (v: any) => {
-      // Exclude delivered vehicles
+  const filteredVehicles = useMemo(() => {
+    if (!data?.vehicles) return [];
+    
+    const query = debouncedSearch.toLowerCase();
+    
+    return data.vehicles.filter((v: any) => {
+      // Exclude delivered
       if (v.status === 'DELIVERED') return false;
       
-      // Exclude vehicles with completely cancelled slot bookings
+      // Exclude cancelled bookings
       if (v.slotBooking?.status === 'CANCELLED') {
-        const allServicesCancelled = v.slotBooking.services?.every(
-          (s: any) => s.status === 'CANCELLED'
-        );
-        if (allServicesCancelled) return false;
+        if (v.slotBooking.services?.every((s: any) => s.status === 'CANCELLED')) {
+          return false;
+        }
       }
       
-      // Include all vehicles that have a slot booking (new system)
-      if (v.slotBooking) return true;
+      // Include slot bookings or WASH service
+      if (!v.slotBooking && v.serviceType !== 'WASH') return false;
       
-      // Include WASH service vehicles (old system without slot booking)
-      if (v.serviceType === 'WASH') return true;
+      // Search filter
+      if (!query) return true;
       
-      return false;
-    }
-  ) || [];
-
-  // Debug logging
-  console.log('=== WASH CYCLE RENDER ===');
-  console.log('Loading:', loading);
-  console.log('Error:', error);
-  console.log('Data:', data);
-  console.log('Has vehicles:', !!data?.vehicles);
-  console.log('Vehicles count:', data?.vehicles?.length);
-  
-  if (data?.vehicles) {
-    console.log('=== WASH CYCLE DEBUG ===');
-    console.log('Total vehicles:', data.vehicles.length);
-    console.log('RECEIVED vehicles:', data.vehicles.filter((v: any) => v.status === 'RECEIVED').length);
-    console.log('Vehicles with slot bookings:', data.vehicles.filter((v: any) => v.slotBooking).length);
-    console.log('WASH service vehicles:', data.vehicles.filter((v: any) => v.serviceType === 'WASH').length);
-    console.log('Active vehicles (filtered):', activeVehicles.length);
-    
-    // Log each vehicle's details
-    data.vehicles.forEach((v: any) => {
-      console.log(`Vehicle ${v.vehicleNumber}:`, {
-        status: v.status,
-        serviceType: v.serviceType,
-        hasSlotBooking: !!v.slotBooking,
-        slotBookingId: v.slotBookingId,
-        delivered: v.status === 'DELIVERED',
-      });
+      const num = (v.vehicleNumber || '').toLowerCase();
+      const mobile = (v.customer?.mobile || '').toLowerCase();
+      const name = (v.customer?.name || '').toLowerCase();
+      
+      return num.includes(query) || mobile.includes(query) || name.includes(query);
     });
-    
-    const receivedWash = data.vehicles.filter((v: any) => 
-      v.status === 'RECEIVED' && v.serviceType === 'WASH'
-    );
-    if (receivedWash.length > 0) {
-      console.log('RECEIVED WASH vehicles:', receivedWash.map((v: any) => ({
-        number: v.vehicleNumber,
-        serviceType: v.serviceType,
-        status: v.status,
-        hasSlotBooking: !!v.slotBooking,
-      })));
-    }
-    console.log('=== END DEBUG ===');
-  }
+  }, [data?.vehicles, debouncedSearch]);
 
   return (
     <View style={styles.container}>
@@ -525,20 +514,48 @@ export default function WashCycleScreen({ navigation }: any) {
         <View style={styles.backButton} />
       </View>
 
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <Text style={styles.searchIcon}>🔍</Text>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search by vehicle number, mobile, or name..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholderTextColor="#9CA3AF"
+          autoCorrect={false}
+          autoCapitalize="none"
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
+            <Text style={styles.clearIcon}>✕</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
       {loading && !data ? (
         <ActivityIndicator size="large" color="#8B5CF6" style={styles.loader} />
       ) : (
         <FlatList
-          data={activeVehicles}
+          data={filteredVehicles}
           renderItem={renderVehicle}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={loading} onRefresh={refetch} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          updateCellsBatchingPeriod={50}
+          initialNumToRender={10}
+          windowSize={10}
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>✨</Text>
-              <Text style={styles.emptyText}>No active vehicles</Text>
-              <Text style={styles.emptySubtext}>All vehicles have been delivered</Text>
+              <Text style={styles.emptyText}>
+                {debouncedSearch ? 'No vehicles found' : 'No active vehicles'}
+              </Text>
+              <Text style={styles.emptySubtext}>
+                {debouncedSearch ? 'Try a different search term' : 'All vehicles have been delivered'}
+              </Text>
             </View>
           }
         />
@@ -1157,5 +1174,42 @@ const styles = StyleSheet.create({
   },
   serviceStatusButtonTextComplete: {
     color: '#fff',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  searchIcon: {
+    fontSize: 18,
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: '#1F2937',
+    paddingVertical: 4,
+  },
+  clearButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  clearIcon: {
+    fontSize: 18,
+    color: '#9CA3AF',
+    fontWeight: 'bold',
   },
 });

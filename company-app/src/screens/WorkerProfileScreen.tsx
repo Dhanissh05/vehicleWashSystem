@@ -64,7 +64,16 @@ const VERIFY_PROFILE_OTP = gql`
 `;
 
 export default function WorkerProfileScreen({ navigation }: any) {
-  const { data, loading, refetch } = useQuery(GET_ME);
+  const { data, loading, refetch } = useQuery(GET_ME, {
+    onError: (error) => {
+      console.log('Error fetching user profile:', error.message);
+      // If authentication error, redirect to login
+      if (error.message.includes('Unauthorized') || error.message.includes('null')) {
+        AsyncStorage.removeItem('token');
+        navigation.replace('Login');
+      }
+    },
+  });
   const [updateProfile, { loading: updatingProfile }] = useMutation(UPDATE_PROFILE, {
     refetchQueries: [{ query: GET_ME }],
   });

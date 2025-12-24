@@ -41,7 +41,8 @@ export default function DashboardScreen({ navigation }: any) {
   } | null>(null);
 
   const { data, loading, refetch } = useQuery(DASHBOARD_METRICS, {
-    pollInterval: 30000, // Refresh every 30 seconds
+    pollInterval: 60000, // Refresh every 60 seconds
+    errorPolicy: 'ignore',
   });
 
   const metrics = data?.dashboardMetrics;

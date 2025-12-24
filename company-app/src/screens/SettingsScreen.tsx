@@ -131,7 +131,11 @@ export default function SettingsScreen({ navigation }: any) {
   const [mobileVerified, setMobileVerified] = useState(false);
 
   const { data, loading, refetch } = useQuery(GET_CENTER);
-  const { data: userData, loading: userLoading, refetch: refetchUser } = useQuery(GET_ME);
+  const { data: userData, loading: userLoading, refetch: refetchUser } = useQuery(GET_ME, {
+    onError: (error) => {
+      console.log('Error fetching user data:', error.message);
+    },
+  });
   const { data: slotConfigData, refetch: refetchSlotConfig } = useQuery(GET_SYSTEM_CONFIG, {
     variables: { key: 'ENABLE_SLOT_BOOKING' },
   });

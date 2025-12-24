@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useQuery, useMutation, gql } from '@apollo/client';
 import { Audio } from 'expo-av';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const GET_CENTER = gql`
   query GetCenter {
@@ -135,84 +136,44 @@ const UPDATE_SYSTEM_CONFIG = gql`
 `;
 
 export default function SlotBookingsScreen({ navigation }: any) {
-  const [filter, setFilter] = useState<'PENDING' | 'ALL'>('ALL');
+  const [filter, setFilter] = useState<'PENDING' | 'VERIFIED' | 'CANCELLED' | 'ALL'>('ALL');
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [otpInput, setOtpInput] = useState('');
-  const playedBookingIds = useRef<Set<string>>(new Set());
+  const [notificationMuted, setNotificationMuted] = useState(false);
 
-  const { data, loading, refetch } = useQuery(SLOT_BOOKINGS, {
-    variables: { status: filter === 'PENDING' ? 'PENDING' : null },
-    fetchPolicy: 'network-only',
-    pollInterval: 5000, // Poll every 5 seconds for new bookings
-  });
-
-  // Play sound when new booking arrives
+  // Load mute preference
   useEffect(() => {
-    const playNewBookingSound = async () => {
-      console.log('🔊 Playing notification sound for new booking...');
+    const loadMuteSetting = async () => {
       try {
-        // Configure audio mode
-        await Audio.setAudioModeAsync({
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: false,
-          shouldDuckAndroid: true,
-        });
-        
-        // Try to load and play the notification sound
-        try {
-          console.log('📂 Loading notification.mp3...');
-          const { sound } = await Audio.Sound.createAsync(
-            require('../../assets/notification.mp3')
-          );
-          console.log('▶️ Playing sound...');
-          await sound.playAsync();
-          console.log('✅ Sound played successfully!');
-          
-          // Unload sound after it finishes playing
-          sound.setOnPlaybackStatusUpdate((status: any) => {
-            if (status.didJustFinish) {
-              console.log('🔚 Sound finished, unloading...');
-              sound.unloadAsync();
-            }
-          });
-        } catch (soundError) {
-          console.log('❌ Notification sound error:', soundError);
-          console.log('Please ensure notification.mp3 exists in company-app/assets/');
-        }
+        const muted = await AsyncStorage.getItem('slot_notification_muted');
+        setNotificationMuted(muted === 'true');
       } catch (error) {
-        console.log('❌ Error setting audio mode:', error);
+        console.log('Error loading mute setting:', error);
       }
     };
+    loadMuteSetting();
+  }, []);
 
-    if (data?.slotBookings) {
-      const pendingBookings = data.slotBookings.filter((b: any) => b.status === 'PENDING');
-      
-      // Check for new bookings that haven't played sound yet
-      const newBookings = pendingBookings.filter((b: any) => !playedBookingIds.current.has(b.id));
-      
-      if (newBookings.length > 0) {
-        console.log(`🆕 ${newBookings.length} new booking(s) detected!`);
-        
-        // Play sound once for new bookings
-        playNewBookingSound();
-        
-        // Mark these bookings as played
-        newBookings.forEach((b: any) => {
-          playedBookingIds.current.add(b.id);
-        });
-      }
-      
-      // Clean up tracking for bookings that are no longer pending
-      // This prevents the Set from growing indefinitely
-      const currentPendingIds = new Set(pendingBookings.map((b: any) => b.id));
-      playedBookingIds.current.forEach((id) => {
-        if (!currentPendingIds.has(id)) {
-          playedBookingIds.current.delete(id);
-        }
-      });
+  // Handle mute toggle
+  const handleToggleMute = async (value: boolean) => {
+    try {
+      await AsyncStorage.setItem('slot_notification_muted', value.toString());
+      setNotificationMuted(value);
+    } catch (error) {
+      console.log('Error saving mute setting:', error);
+      Alert.alert('Error', 'Failed to update notification setting');
     }
-  }, [data]);
+  };
+
+  const { data, loading, refetch } = useQuery(SLOT_BOOKINGS, {
+    variables: { status: filter === 'ALL' ? null : filter },
+    fetchPolicy: 'cache-first',
+    pollInterval: 3000, // Poll every 3 seconds for real-time updates
+    errorPolicy: 'ignore',
+  });
+
+  // Note: Sound notification is handled globally by BookingNotificationListener component
 
   const { data: configData, refetch: refetchConfig } = useQuery(GET_SYSTEM_CONFIG, {
     variables: { key: 'ENABLE_SLOT_BOOKING' },
@@ -243,7 +204,10 @@ export default function SlotBookingsScreen({ navigation }: any) {
   });
 
   const [cancelBooking] = useMutation(CANCEL_SLOT_BOOKING, {
-    refetchQueries: [{ query: GET_CENTER }],
+    refetchQueries: [
+      { query: GET_CENTER },
+      { query: SLOT_BOOKINGS, variables: { status: filter === 'ALL' ? null : filter } }
+    ],
     awaitRefetchQueries: true,
     onCompleted: () => {
       Alert.alert('Success', 'Booking cancelled');
@@ -419,6 +383,20 @@ export default function SlotBookingsScreen({ navigation }: any) {
           />
         </View>
 
+        {/* Notification Mute Toggle */}
+        <View style={styles.toggleContainer}>
+          <View style={styles.muteInfo}>
+            <Text style={styles.muteIcon}>{notificationMuted ? '🔇' : '🔔'}</Text>
+            <Text style={styles.toggleLabel}>Booking Notifications</Text>
+          </View>
+          <Switch
+            value={!notificationMuted}
+            onValueChange={(value) => handleToggleMute(!value)}
+            trackColor={{ false: '#E5E7EB', true: '#A78BFA' }}
+            thumbColor={!notificationMuted ? '#8B5CF6' : '#9CA3AF'}
+          />
+        </View>
+
         <View style={styles.filterContainer}>
           <TouchableOpacity
             style={[styles.filterButton, filter === 'PENDING' && styles.filterButtonActive]}
@@ -426,6 +404,22 @@ export default function SlotBookingsScreen({ navigation }: any) {
           >
             <Text style={[styles.filterText, filter === 'PENDING' && styles.filterTextActive]}>
               Pending
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterButton, filter === 'VERIFIED' && styles.filterButtonActive]}
+            onPress={() => setFilter('VERIFIED')}
+          >
+            <Text style={[styles.filterText, filter === 'VERIFIED' && styles.filterTextActive]}>
+              Verified
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterButton, filter === 'CANCELLED' && styles.filterButtonActive]}
+            onPress={() => setFilter('CANCELLED')}
+          >
+            <Text style={[styles.filterText, filter === 'CANCELLED' && styles.filterTextActive]}>
+              Cancelled
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -525,6 +519,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: '#E5E7EB',
+  },
+  muteInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  muteIcon: {
+    fontSize: 20,
   },
   toggleLabel: { fontSize: 14, fontWeight: '600', color: '#374151' },
   filterContainer: { flexDirection: 'row', gap: 12 },

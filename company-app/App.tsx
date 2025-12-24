@@ -4,6 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { ApolloProvider, ApolloClient, InMemoryCache, createHttpLink } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
+import { onError } from '@apollo/client/link/error';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { useVersionChecker } from './src/hooks/useVersionChecker';
@@ -41,6 +42,25 @@ const httpLink = createHttpLink({
   uri: API_URL,
 });
 
+const errorLink = onError(({ graphQLErrors, networkError }) => {
+  if (graphQLErrors) {
+    graphQLErrors.forEach(({ message, locations, path }) => {
+      // Ignore null me errors - these happen when user isn't authenticated
+      if (path && path.includes('me') && message.includes('null')) {
+        return;
+      }
+      // Only log once, not on every retry
+      if (!message.includes('Unexpected end')) {
+        console.log(`[GraphQL error]: ${message}`);
+      }
+    });
+  }
+  // Suppress network error spam - only log once
+  if (networkError && !networkError.message.includes('Unexpected end')) {
+    console.log(`[Network error]: ${networkError}`);
+  }
+});
+
 const authLink = setContext(async (_, { headers }) => {
   const token = await AsyncStorage.getItem('token');
   return {
@@ -52,7 +72,7 @@ const authLink = setContext(async (_, { headers }) => {
 });
 
 const apolloClient = new ApolloClient({
-  link: authLink.concat(httpLink),
+  link: errorLink.concat(authLink.concat(httpLink)),
   cache: new InMemoryCache(),
   defaultOptions: {
     watchQuery: {

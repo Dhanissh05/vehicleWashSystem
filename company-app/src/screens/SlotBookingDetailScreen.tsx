@@ -54,6 +54,15 @@ const SLOT_BOOKING_BY_ID = gql`
   }
 `;
 
+const SLOT_BOOKINGS = gql`
+  query SlotBookings($status: SlotBookingStatus) {
+    slotBookings(status: $status) {
+      id
+      status
+    }
+  }
+`;
+
 const CANCEL_SLOT_BY_STAFF = gql`
   mutation CancelSlotByStaff($bookingId: ID!) {
     cancelSlotByStaff(bookingId: $bookingId) {
@@ -91,20 +100,48 @@ const UPDATE_SERVICE_STATUS = gql`
 `;
 
 export default function SlotBookingDetailScreen({ route, navigation }: any) {
-  const { bookingId } = route.params;
+  const { bookingId } = route?.params || {};
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [selectedService, setSelectedService] = useState<any>(null);
   const [notes, setNotes] = useState('');
 
+  // Handle back navigation
+  const handleGoBack = () => {
+    console.log('Back button pressed, bookingId:', bookingId);
+    if (navigation && typeof navigation.goBack === 'function') {
+      navigation.goBack();
+    } else if (navigation && typeof navigation.navigate === 'function') {
+      navigation.navigate('SlotBookings');
+    } else {
+      console.error('Navigation not available');
+    }
+  };
+
   const { data, loading, refetch } = useQuery(SLOT_BOOKING_BY_ID, {
     variables: { id: bookingId },
     fetchPolicy: 'network-only',
+    onError: (error) => {
+      console.error('Error loading booking:', error.message);
+    },
+    onCompleted: (data) => {
+      console.log('Booking loaded:', data?.slotBookingById?.id);
+    },
   });
 
   const [cancelSlot] = useMutation(CANCEL_SLOT_BY_STAFF, {
+    refetchQueries: [
+      { query: SLOT_BOOKINGS, variables: { status: null } },
+      { query: SLOT_BOOKINGS, variables: { status: 'PENDING' } },
+      { query: SLOT_BOOKINGS, variables: { status: 'CANCELLED' } },
+    ],
+    awaitRefetchQueries: true,
     onCompleted: () => {
-      Alert.alert('Success', 'Slot booking cancelled');
-      refetch();
+      Alert.alert('Success', 'Slot booking cancelled', [
+        {
+          text: 'OK',
+          onPress: () => navigation.goBack(),
+        },
+      ]);
     },
     onError: (error) => {
       Alert.alert('Error', error.message);
@@ -263,7 +300,7 @@ export default function SlotBookingDetailScreen({ route, navigation }: any) {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
             <Text style={styles.backIcon}>←</Text>
           </TouchableOpacity>
           <Text style={styles.title}>Slot Details</Text>
@@ -278,7 +315,7 @@ export default function SlotBookingDetailScreen({ route, navigation }: any) {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
             <Text style={styles.backIcon}>←</Text>
           </TouchableOpacity>
           <Text style={styles.title}>Slot Details</Text>
@@ -294,7 +331,11 @@ export default function SlotBookingDetailScreen({ route, navigation }: any) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <TouchableOpacity 
+          onPress={handleGoBack} 
+          style={styles.backButton}
+          activeOpacity={0.7}
+        >
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Slot Details</Text>
@@ -522,11 +563,17 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E5E7EB',
   },
   backButton: {
-    padding: 8,
+    padding: 12,
+    marginRight: 8,
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   backIcon: {
-    fontSize: 24,
+    fontSize: 28,
     color: '#1F2937',
+    fontWeight: 'bold',
   },
   title: {
     fontSize: 18,

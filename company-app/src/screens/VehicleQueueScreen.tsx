@@ -63,7 +63,7 @@ export default function VehicleQueueScreen() {
   const [selectedFilter, setSelectedFilter] = useState<string | undefined>(undefined);
   const { data, loading, refetch } = useQuery(VEHICLES, {
     variables: { status: selectedFilter },
-    pollInterval: 10000, // Poll every 10 seconds
+    errorPolicy: 'ignore',
   });
 
   const [updateStatus, { loading: updating }] = useMutation(UPDATE_VEHICLE_STATUS, {

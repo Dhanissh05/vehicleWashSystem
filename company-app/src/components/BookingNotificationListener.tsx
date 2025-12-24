@@ -1,6 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useQuery, gql } from '@apollo/client';
 import { Audio } from 'expo-av';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import GlobalNotification from './GlobalNotification';
 
 const SLOT_BOOKINGS_COUNT = gql`
   query SlotBookingsCount {
@@ -12,10 +14,39 @@ const SLOT_BOOKINGS_COUNT = gql`
 
 export default function BookingNotificationListener() {
   const playedBookingIds = useRef<Set<string>>(new Set());
+  const [showNotification, setShowNotification] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState('');
+  const [isMuted, setIsMuted] = useState(false);
+
+  // Load mute preference
+  useEffect(() => {
+    const loadMuteSetting = async () => {
+      try {
+        const muted = await AsyncStorage.getItem('slot_notification_muted');
+        setIsMuted(muted === 'true');
+      } catch (error) {
+        console.log('Error loading mute setting:', error);
+      }
+    };
+    loadMuteSetting();
+
+    // Listen for mute setting changes
+    const interval = setInterval(async () => {
+      try {
+        const muted = await AsyncStorage.getItem('slot_notification_muted');
+        setIsMuted(muted === 'true');
+      } catch (error) {
+        console.log('Error checking mute setting:', error);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const { data } = useQuery(SLOT_BOOKINGS_COUNT, {
     fetchPolicy: 'network-only',
-    pollInterval: 5000, // Poll every 5 seconds
+    pollInterval: 3000, // Poll every 3 seconds for instant detection
+    errorPolicy: 'ignore',
   });
 
   useEffect(() => {
@@ -30,7 +61,7 @@ export default function BookingNotificationListener() {
         
         try {
           const { sound } = await Audio.Sound.createAsync(
-            require('../assets/notification.mp3')
+            require('../../assets/notification.mp3')
           );
           await sound.playAsync();
           
@@ -56,8 +87,17 @@ export default function BookingNotificationListener() {
       if (newBookings.length > 0) {
         console.log(`🆕 [Background] ${newBookings.length} new booking(s) detected!`);
         
-        // Play sound once for new bookings
-        playNewBookingSound();
+        // Only play sound and show notification if not muted
+        if (!isMuted) {
+          // Play sound once for new bookings
+          playNewBookingSound();
+          
+          // Show visual notification
+          setNotificationMessage('Slot Booking has been received');
+          setShowNotification(true);
+        } else {
+          console.log('🔇 [Background] Notifications muted, skipping sound and visual alert');
+        }
         
         // Mark these bookings as played
         newBookings.forEach((b: any) => {
@@ -75,5 +115,12 @@ export default function BookingNotificationListener() {
     }
   }, [data]);
 
-  return null; // This component doesn't render anything
+  return (
+    <GlobalNotification
+      message={notificationMessage}
+      visible={showNotification}
+      onHide={() => setShowNotification(false)}
+      duration={5000}
+    />
+  );
 }
