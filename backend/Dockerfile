@@ -41,6 +41,7 @@ COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nodejs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nodejs:nodejs /app/package*.json ./
 COPY --from=builder --chown=nodejs:nodejs /app/cleanup-duplicates.sql ./
+COPY --from=builder --chown=nodejs:nodejs /app/pre-migrate-slug.sql ./
 COPY --from=builder --chown=nodejs:nodejs /app/quick-migrate.js ./
 COPY --from=builder --chown=nodejs:nodejs /app/start.sh ./
 
