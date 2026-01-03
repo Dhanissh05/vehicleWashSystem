@@ -195,7 +195,9 @@ model Pricing {
   vehicles        Vehicle[]
   slotServices    SlotService[]
 
-  @@unique([vehicleType, categoryName])
+  // Note: Unique constraint removed temporarily to allow migration
+  // Add back after updating existing pricing categories
+  // @@unique([vehicleType, categoryName])
   @@index([vehicleType])
   @@index([isActive])
 }
