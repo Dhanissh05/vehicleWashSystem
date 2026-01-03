@@ -207,9 +207,9 @@ model Pricing {
   description     String?
   isActive        Boolean         @default(true)
   
-  // Multi-Tenant: Link pricing to specific center
-  centerId        String
-  center          Center          @relation(fields: [centerId], references: [id], onDelete: Cascade)
+  // Multi-Tenant: Link pricing to specific center (optional during migration)
+  centerId        String?
+  center          Center?         @relation(fields: [centerId], references: [id], onDelete: Cascade)
   
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt

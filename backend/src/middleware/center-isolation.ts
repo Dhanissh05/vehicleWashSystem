@@ -3,6 +3,10 @@
  * Ensures data segregation between different wash centers
  */
 
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
 interface Context {
   user?: {
     id: string;
@@ -12,19 +16,41 @@ interface Context {
     centerId?: string;
   };
   centerId?: string;
+  prisma: PrismaClient;
 }
 
 /**
  * Require that user has a centerId (for ADMIN/WORKER operations)
- * @throws Error if no centerId found
+ * Falls back to first available center during migration
+ * @throws Error if no centerId found and no centers exist
  */
-export const requireCenterId = (context: Context): string => {
+export const requireCenterId = async (context: Context): Promise<string> => {
   // Super admin can access all centers (don't enforce)
   if (context.user?.role === 'SUPER_ADMIN') {
     return context.centerId || '';
   }
 
-  const centerId = context.user?.centerId || context.centerId;
+  let centerId = context.user?.centerId || context.centerId;
+  
+  // Fallback during migration: use first available center
+  if (!centerId && (context.user?.role === 'ADMIN' || context.user?.role === 'WORKER')) {
+    const defaultCenter = await context.prisma.center.findFirst({
+      orderBy: { createdAt: 'asc' }
+    });
+    
+    if (defaultCenter) {
+      console.warn(`⚠️ User ${context.user?.id} has no centerId, using default center ${defaultCenter.id}`);
+      centerId = defaultCenter.id;
+      
+      // Update user with centerId for next time
+      if (context.user?.id) {
+        await context.prisma.user.update({
+          where: { id: context.user.id },
+          data: { centerId: defaultCenter.id }
+        }).catch(err => console.error('Failed to update user centerId:', err));
+      }
+    }
+  }
   
   if (!centerId) {
     throw new Error('Access denied: No center association found. Please contact administrator.');

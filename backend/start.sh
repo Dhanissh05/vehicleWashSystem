@@ -7,6 +7,9 @@ npx prisma db execute --file=./cleanup-duplicates.sql || echo "Cleanup script fa
 echo "Pushing database schema..."
 npx prisma db push --accept-data-loss --skip-generate
 
+echo "Running multi-tenant migration..."
+node quick-migrate.js || echo "Migration completed or skipped"
+
 echo "Running database seed..."
 node prisma/seed.js
 

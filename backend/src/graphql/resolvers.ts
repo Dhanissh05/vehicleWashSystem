@@ -130,7 +130,7 @@ export const resolvers = {
       context: Context
     ) => {
       requireStaff(context);
-      const centerId = requireCenterId(context);
+      const centerId = await requireCenterId(context);
       
       return await context.prisma.vehicle.findMany({
         where: {
@@ -308,7 +308,7 @@ export const resolvers = {
 
     // Get pricing
     pricing: async (_: any, __: any, context: Context) => {
-      const centerId = requireCenterId(context); // Enforce center check
+      const centerId = await requireCenterId(context); // Enforce center check
       return await context.prisma.pricing.findMany({
         where: { 
           centerId,  // Filter by centerId for multi-tenant isolation
@@ -320,7 +320,7 @@ export const resolvers = {
 
     // Get pricing by type
     pricingByType: async (_: any, { vehicleType, carCategory }: any, context: Context) => {
-      const centerId = requireCenterId(context);
+      const centerId = await requireCenterId(context);
       return await context.prisma.pricing.findFirst({
         where: {
           centerId,  // Filter by centerId
@@ -334,7 +334,7 @@ export const resolvers = {
     // Get workers
     workers: async (_: any, __: any, context: Context) => {
       requireAdmin(context);
-      const centerId = requireCenterId(context);
+      const centerId = await requireCenterId(context);
       
       return await context.prisma.user.findMany({
         where: { 
@@ -430,7 +430,7 @@ export const resolvers = {
 
     slotBookings: async (_: any, { status }: any, context: Context) => {
       requireStaff(context);
-      const centerId = requireCenterId(context);
+      const centerId = await requireCenterId(context);
 
       const where: any = { centerId };  // Filter by centerId for multi-tenant isolation
       if (status) {
@@ -1491,7 +1491,7 @@ export const resolvers = {
     // Create pricing
     createPricing: async (_: any, { input }: any, context: Context) => {
       requireAdmin(context);
-      const centerId = requireCenterId(context);
+      const centerId = await requireCenterId(context);
       
       // Check if pricing with same vehicleType and categoryName already exists for this center
       const existing = await context.prisma.pricing.findFirst({
@@ -1521,7 +1521,7 @@ export const resolvers = {
     // Update pricing
     updatePricing: async (_: any, { input }: any, context: Context) => {
       requireAdmin(context);
-      const centerId = requireCenterId(context);
+      const centerId = await requireCenterId(context);
       
       // Verify pricing belongs to user's center
       const pricing = await context.prisma.pricing.findUnique({
@@ -1553,7 +1553,7 @@ export const resolvers = {
     // Delete pricing
     deletePricing: async (_: any, { id }: any, context: Context) => {
       requireAdmin(context);
-      const centerId = requireCenterId(context);
+      const centerId = await requireCenterId(context);
       
       // Verify pricing belongs to user's center
       const pricing = await context.prisma.pricing.findUnique({
@@ -1977,7 +1977,7 @@ export const resolvers = {
     // Create worker (Admin only) - Returns credentials for SMS/display
     createWorker: async (_: any, { input }: any, context: Context) => {
       requireAdmin(context);
-      const centerId = requireCenterId(context);
+      const centerId = await requireCenterId(context);
       
       // Generate worker code if not provided
       const workerCode = input.workerCode || `WRK${Math.floor(1000 + Math.random() * 9000)}`;
