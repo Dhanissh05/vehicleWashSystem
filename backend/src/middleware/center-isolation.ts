@@ -63,13 +63,13 @@ export const requireCenterId = async (context: Context): Promise<string> => {
  * Verify that user can only access their own center's data
  * @throws Error if trying to access another center's resource
  */
-export const requireOwnCenter = (context: Context, resourceCenterId: string): void => {
+export const requireOwnCenter = async (context: Context, resourceCenterId: string): Promise<void> => {
   // Super admin can access all centers
   if (context.user?.role === 'SUPER_ADMIN') {
     return;
   }
 
-  const userCenterId = requireCenterId(context);
+  const userCenterId = await requireCenterId(context);
   
   if (userCenterId !== resourceCenterId) {
     throw new Error('Access denied: Cannot access another center\'s data');

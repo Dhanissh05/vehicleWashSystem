@@ -1530,7 +1530,9 @@ export const resolvers = {
       });
       
       if (!pricing) throw new Error('Pricing not found');
-      requireOwnCenter(context, pricing.centerId);
+      if (pricing.centerId) {
+        await requireOwnCenter(context, pricing.centerId);
+      }
       
       const updateData: any = {};
       
@@ -1562,7 +1564,9 @@ export const resolvers = {
       });
       
       if (!pricing) throw new Error('Pricing not found');
-      requireOwnCenter(context, pricing.centerId);
+      if (pricing.centerId) {
+        await requireOwnCenter(context, pricing.centerId);
+      }
       
       await context.prisma.pricing.delete({
         where: { id },
