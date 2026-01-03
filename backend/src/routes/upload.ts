@@ -102,15 +102,25 @@ router.post(
       }
 
       // Construct URL for the uploaded file
-      // Use BASE_URL from env, or try to get host from request headers for network access
+      // Priority: BASE_URL > RAILWAY_PUBLIC_DOMAIN > request headers > localhost
       let baseUrl = process.env.BASE_URL;
+      
+      // Railway provides public domain in environment
+      if (!baseUrl && process.env.RAILWAY_PUBLIC_DOMAIN) {
+        baseUrl = `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
+      }
+      
+      // Fallback to request headers for local network access
       if (!baseUrl && req.headers.host) {
         const protocol = req.protocol || 'http';
         baseUrl = `${protocol}://${req.headers.host}`;
       }
+      
+      // Final fallback to localhost
       if (!baseUrl) {
         baseUrl = `http://localhost:${process.env.PORT || 4000}`;
       }
+      
       const fileUrl = `${baseUrl}/uploads/logo/${req.file.filename}`;
 
       res.json({
@@ -154,7 +164,17 @@ router.post(
         mimetype: req.file.mimetype
       });
 
-      const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 4000}`;
+      let baseUrl = process.env.BASE_URL;
+      if (!baseUrl && process.env.RAILWAY_PUBLIC_DOMAIN) {
+        baseUrl = `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
+      }
+      if (!baseUrl && req.headers.host) {
+        const protocol = req.protocol || 'http';
+        baseUrl = `${protocol}://${req.headers.host}`;
+      }
+      if (!baseUrl) {
+        baseUrl = `http://localhost:${process.env.PORT || 4000}`;
+      }
       const fileUrl = `${baseUrl}/uploads/general/${req.file.filename}`;
 
       console.log('Upload successful:', fileUrl);
@@ -188,7 +208,17 @@ router.post(
         return res.status(400).json({ error: 'No file uploaded' });
       }
 
-      const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 4000}`;
+      let baseUrl = process.env.BASE_URL;
+      if (!baseUrl && process.env.RAILWAY_PUBLIC_DOMAIN) {
+        baseUrl = `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
+      }
+      if (!baseUrl && req.headers.host) {
+        const protocol = req.protocol || 'http';
+        baseUrl = `${protocol}://${req.headers.host}`;
+      }
+      if (!baseUrl) {
+        baseUrl = `http://localhost:${process.env.PORT || 4000}`;
+      }
       const fileUrl = `${baseUrl}/uploads/payment/${req.file.filename}`;
 
       res.json({
