@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
 
 interface GlobalNotificationProps {
@@ -14,7 +14,7 @@ export default function GlobalNotification({
   onHide,
   duration = 5000 
 }: GlobalNotificationProps) {
-  const [slideAnim] = useState(new Animated.Value(-100));
+  const slideAnim = useRef(new Animated.Value(-100)).current;
 
   useEffect(() => {
     if (visible) {

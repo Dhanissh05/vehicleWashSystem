@@ -47,7 +47,10 @@ export default function LoginScreen({ navigation }: any) {
   const [selectedRole, setSelectedRole] = useState<'ADMIN' | 'WORKER'>('ADMIN');
 
   const [login, { loading }] = useMutation(LOGIN);
-  const { data } = useQuery(GET_CENTER);
+  const { data } = useQuery(GET_CENTER, {
+    errorPolicy: 'ignore',
+    fetchPolicy: 'cache-first',
+  });
   
   const center = data?.centers?.[0];
 

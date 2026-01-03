@@ -38,6 +38,7 @@ export function PaymentMethodModal({
           input: {
             vehicleId,
             method,
+            expectedAmount: amount,
           },
         },
       });

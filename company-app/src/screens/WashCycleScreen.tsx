@@ -30,6 +30,12 @@ const GET_ACTIVE_VEHICLES = gql`
       receivedAt
       washingAt
       readyAt
+      pricing {
+        id
+        categoryName
+        price
+        vehicleType
+      }
       center {
         id
         name
@@ -57,6 +63,14 @@ const GET_ACTIVE_VEHICLES = gql`
           id
           serviceType
           status
+          pricing {
+            id
+            categoryName
+            price
+            vehicleType
+          }
+          customPrice
+          customPricingName
           startedAt
           startedBy
           completedAt
@@ -68,6 +82,51 @@ const GET_ACTIVE_VEHICLES = gql`
           notes
         }
       }
+    }
+  }
+`;
+
+const GET_PRICING_OPTIONS = gql`
+  query GetPricingOptions {
+    pricing {
+      id
+      vehicleType
+      categoryName
+      price
+      description
+    }
+  }
+`;
+
+const UPDATE_VEHICLE_PRICING = gql`
+  mutation UpdateVehiclePricing($input: UpdateVehiclePricingInput!) {
+    updateVehiclePricing(input: $input) {
+      id
+      pricing {
+        id
+        categoryName
+        price
+      }
+      payment {
+        id
+        amount
+      }
+    }
+  }
+`;
+
+const UPDATE_SERVICE_PRICING = gql`
+  mutation UpdateServicePricing($input: UpdateServicePricingInput!) {
+    updateServicePricing(input: $input) {
+      id
+      pricing {
+        id
+        categoryName
+        price
+        vehicleType
+      }
+      customPrice
+      customPricingName
     }
   }
 `;
@@ -103,22 +162,64 @@ const UPDATE_SERVICE_STATUS = gql`
   }
 `;
 
+const DELETE_PAYMENT = gql`
+  mutation DeletePayment($vehicleId: ID!) {
+    deletePayment(vehicleId: $vehicleId)
+  }
+`;
+
+const ADJUST_PAYMENT = gql`
+  mutation AdjustPayment($vehicleId: ID!) {
+    adjustPayment(vehicleId: $vehicleId) {
+      id
+      amount
+      status
+      method
+    }
+  }
+`;
+
+const CONFIRM_BILL = gql`
+  mutation ConfirmBill($vehicleId: ID!) {
+    confirmBill(vehicleId: $vehicleId) {
+      id
+      status
+      readyAt
+    }
+  }
+`;
+
 export default function WashCycleScreen({ navigation }: any) {
   const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
   const [selectedService, setSelectedService] = useState<any>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [serviceModalVisible, setServiceModalVisible] = useState(false);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [pricingModalVisible, setPricingModalVisible] = useState(false);
+  const [customPriceModalVisible, setCustomPriceModalVisible] = useState(false);
+  const [customPrice, setCustomPrice] = useState('');
+  const [customPricingName, setCustomPricingName] = useState('');
   const [notes, setNotes] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const { data, loading, refetch } = useQuery(GET_ACTIVE_VEHICLES, {
-    fetchPolicy: 'network-only',
-    nextFetchPolicy: 'cache-first',
-    pollInterval: 5000, // Poll every 5 seconds for real-time updates
+  const { data, loading, refetch, error, networkStatus } = useQuery(GET_ACTIVE_VEHICLES, {
+    fetchPolicy: 'cache-and-network',
+    pollInterval: error ? 0 : 5000,
+    errorPolicy: 'ignore',
+    notifyOnNetworkStatusChange: true,
+  });
+
+  const { data: pricingData, error: pricingError } = useQuery(GET_PRICING_OPTIONS, {
+    fetchPolicy: 'cache-and-network',
+    errorPolicy: 'all',
+    onError: (error) => {
+      console.error('Pricing fetch error:', error);
+      Alert.alert('Error', 'Failed to load pricing options. Please try again.');
+    },
   });
 
   // Auto-refetch when screen comes into focus
@@ -166,6 +267,77 @@ export default function WashCycleScreen({ navigation }: any) {
       setServiceModalVisible(false);
       setSelectedService(null);
       setNotes('');
+      refetch();
+    },
+    onError: (error) => {
+      Alert.alert('Error', error.message);
+    },
+  });
+
+  const [updateVehiclePricing] = useMutation(UPDATE_VEHICLE_PRICING, {
+    onCompleted: () => {
+      Alert.alert('Success', 'Pricing category updated successfully');
+      setPricingModalVisible(false);
+      setSelectedVehicle(null);
+      refetch();
+    },
+    onError: (error) => {
+      Alert.alert('Error', error.message);
+    },
+  });
+
+  const [updateServicePricing, { loading: updatingServicePricing }] = useMutation(UPDATE_SERVICE_PRICING, {
+    refetchQueries: [{ query: GET_ACTIVE_VEHICLES }],
+    awaitRefetchQueries: true,
+    onCompleted: async (mutationData) => {
+      console.log('Service pricing updated and refetched:', mutationData);
+      
+      setPricingModalVisible(false);
+      setSelectedService(null);
+      setSelectedVehicle(null);
+      
+      // Force re-render with new key
+      setRefreshKey(prev => prev + 1);
+      
+      Alert.alert('Success', 'Service pricing updated successfully');
+    },
+    onError: (error) => {
+      console.error('Update pricing error:', error);
+      Alert.alert('Error', error.message);
+    },
+  });
+
+  const [deletePayment] = useMutation(DELETE_PAYMENT, {
+    onCompleted: () => {
+      Alert.alert('Success', 'Payment reset successfully');
+      refetch();
+    },
+    onError: (error) => {
+      Alert.alert('Error', error.message);
+    },
+  });
+
+  const [adjustPayment] = useMutation(ADJUST_PAYMENT, {
+    onCompleted: (data) => {
+      Alert.alert(
+        'Payment Adjusted',
+        `Payment amount updated to ₹${data.adjustPayment.amount}. Customer will need to complete payment again.`,
+        [{ text: 'OK' }]
+      );
+      refetch();
+    },
+    onError: (error) => {
+      Alert.alert('Error', error.message);
+    },
+  });
+
+  const [confirmBill] = useMutation(CONFIRM_BILL, {
+    onCompleted: () => {
+      Alert.alert(
+        'Success',
+        'Bill confirmed! Vehicle marked as Ready for Pickup. Customer has been notified.',
+        [{ text: 'OK' }]
+      );
       refetch();
     },
     onError: (error) => {
@@ -368,9 +540,10 @@ export default function WashCycleScreen({ navigation }: any) {
                 
                 return item.slotBooking.services.map((service: any) => {
                   const canStartThisService = service.status === 'BOOKED' && !hasActiveService;
+                  const pricingKey = `${service.id}-${service.pricing?.id || 'none'}-${service.customPrice || 'none'}-${refreshKey}`;
                   
                   return (
-                <View key={service.id} style={styles.serviceItem}>
+                <View key={pricingKey} style={styles.serviceItem}>
                   <View style={styles.serviceHeader}>
                     <Text style={styles.serviceName}>
                       {service.serviceType === 'CAR_WASH' ? '🚗 Car Wash' :
@@ -388,6 +561,121 @@ export default function WashCycleScreen({ navigation }: any) {
                       <Text style={styles.serviceStatusText}>{service.status}</Text>
                     </View>
                   </View>
+                  
+                  {/* Service Pricing */}
+                  <View style={styles.servicePricingRow}>
+                    <Text style={styles.servicePricingLabel}>Price: </Text>
+                    {service.pricing ? (
+                      <>
+                        <Text style={styles.servicePricingText}>
+                          {service.pricing.categoryName} - ₹{service.pricing.price}
+                        </Text>
+                        {!item.payment && (
+                          <View style={styles.servicePricingButtons}>
+                            <TouchableOpacity
+                              style={styles.changeServicePricingButton}
+                              onPress={() => {
+                                setSelectedService(service);
+                                setSelectedVehicle(item);
+                                setPricingModalVisible(true);
+                              }}
+                            >
+                              <Text style={styles.changeServicePricingButtonText}>Change</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.resetServicePricingButton}
+                              onPress={() => {
+                                Alert.alert(
+                                  'Reset Pricing',
+                                  'Remove pricing for this service?',
+                                  [
+                                    { text: 'Cancel', style: 'cancel' },
+                                    {
+                                      text: 'Reset',
+                                      style: 'destructive',
+                                      onPress: () => {
+                                        updateServicePricing({
+                                          variables: {
+                                            input: {
+                                              serviceId: service.id,
+                                              pricingId: null,
+                                            },
+                                          },
+                                        });
+                                      },
+                                    },
+                                  ]
+                                );
+                              }}
+                            >
+                              <Text style={styles.resetServicePricingButtonText}>Reset</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                      </>
+                    ) : service.customPrice ? (
+                      <>
+                        <Text style={styles.servicePricingText}>
+                          {service.customPricingName || 'Custom'} - ₹{service.customPrice}
+                        </Text>
+                        {!item.payment && (
+                          <View style={styles.servicePricingButtons}>
+                            <TouchableOpacity
+                              style={styles.changeServicePricingButton}
+                              onPress={() => {
+                                setSelectedService(service);
+                                setSelectedVehicle(item);
+                                setPricingModalVisible(true);
+                              }}
+                            >
+                              <Text style={styles.changeServicePricingButtonText}>Change</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.resetServicePricingButton}
+                              onPress={() => {
+                                Alert.alert(
+                                  'Reset Pricing',
+                                  'Remove pricing for this service?',
+                                  [
+                                    { text: 'Cancel', style: 'cancel' },
+                                    {
+                                      text: 'Reset',
+                                      style: 'destructive',
+                                      onPress: () => {
+                                        updateServicePricing({
+                                          variables: {
+                                            input: {
+                                              serviceId: service.id,
+                                              customPrice: null,
+                                              customPricingName: null,
+                                            },
+                                          },
+                                        });
+                                      },
+                                    },
+                                  ]
+                                );
+                              }}
+                            >
+                              <Text style={styles.resetServicePricingButtonText}>Reset</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                      </>
+                    ) : (
+                      <TouchableOpacity
+                        style={styles.selectServicePricingButton}
+                        onPress={() => {
+                          setSelectedService(service);
+                          setSelectedVehicle(item);
+                          setPricingModalVisible(true);
+                        }}
+                      >
+                        <Text style={styles.selectServicePricingButtonText}>+ Select</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  
                   {service.status === 'CANCELLED' && service.cancelledByName && (
                     <Text style={styles.cancelledInfo}>
                       Cancelled by {service.cancelledByName} on {new Date(service.cancelledAt).toLocaleString()}
@@ -427,36 +715,190 @@ export default function WashCycleScreen({ navigation }: any) {
             </View>
           )}
 
+          {/* Vehicle-level Pricing Category (only show for vehicles without slot bookings or legacy pricing) */}
+          {!item.slotBooking && (
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>Category:</Text>
+              <View style={styles.pricingRow}>
+                {item.pricing ? (
+                  <>
+                    <Text style={styles.pricingText}>
+                      {item.pricing.categoryName} - ₹{item.pricing.price}
+                    </Text>
+                    {!item.payment && (
+                      <TouchableOpacity
+                        style={styles.changePricingButton}
+                        onPress={() => {
+                          setSelectedVehicle(item);
+                          setPricingModalVisible(true);
+                        }}
+                      >
+                        <Text style={styles.changePricingButtonText}>Change</Text>
+                      </TouchableOpacity>
+                    )}
+                  </>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.selectPricingButton}
+                    onPress={() => {
+                      setSelectedVehicle(item);
+                      setPricingModalVisible(true);
+                    }}
+                  >
+                    <Text style={styles.selectPricingButtonText}>+ Select Category</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          )}
+
           <View style={styles.infoRow}>
             <Text style={styles.label}>Payment:</Text>
-            {item.payment ? (
-              <View style={[
-                styles.paymentBadge,
-                item.payment.status === 'PAID' ? styles.paymentPaid : styles.paymentPending
-              ]}>
-                <Text style={[
-                  styles.paymentText,
-                  item.payment.status === 'PAID' ? styles.paymentTextPaid : styles.paymentTextPending
-                ]}>
-                  {item.payment.status === 'PAID' ? '✓ Paid' : item.payment.status}
-                </Text>
-              </View>
-            ) : (
-              <Text style={styles.value}>Not Initiated</Text>
-            )}
+            <View>
+              {item.payment ? (
+                <>
+                  <View style={[
+                    styles.paymentBadge,
+                    item.payment.status === 'PAID' ? styles.paymentPaid : styles.paymentPending
+                  ]}>
+                    <Text style={[
+                      styles.paymentText,
+                      item.payment.status === 'PAID' ? styles.paymentTextPaid : styles.paymentTextPending
+                    ]}>
+                      {item.payment.status === 'PAID' ? '✓ Paid' : item.payment.status} - ₹{item.payment.amount}
+                    </Text>
+                  </View>
+                </>
+              ) : (
+                <>
+                  {(() => {
+                    const totalAmount = item.slotBooking?.services?.reduce((sum: number, svc: any) => 
+                      sum + (svc.pricing?.price || svc.customPrice || 0), 0) || 0;
+                    return totalAmount > 0 ? (
+                      <Text style={styles.estimatedAmount}>Est. Total: ₹{totalAmount}</Text>
+                    ) : (
+                      <Text style={styles.value}>Not Initiated</Text>
+                    );
+                  })()}
+                </>
+              )}
+            </View>
           </View>
 
           {item.payment && item.payment.status === 'MANUAL_PENDING' && (
+            <View style={styles.paymentActions}>
+              <TouchableOpacity
+                style={styles.confirmPaymentButton}
+                onPress={() => {
+                  setSelectedVehicle(item);
+                  setPaymentModalVisible(true);
+                }}
+              >
+                <Text style={styles.confirmPaymentButtonText}>
+                  ✓ Confirm Payment Received
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.resetPaymentButton}
+                onPress={() => {
+                  Alert.alert(
+                    'Reset Payment',
+                    'Are you sure you want to reset this payment? This will allow changing the pricing.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Reset',
+                        style: 'destructive',
+                        onPress: () => {
+                          deletePayment({
+                            variables: { vehicleId: item.id },
+                          });
+                        },
+                      },
+                    ]
+                  );
+                }}
+              >
+                <Text style={styles.resetPaymentButtonText}>🔄 Reset Payment</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Adjust Payment button for any payment status before delivery */}
+          {item.payment && item.payment.status !== 'PAID' && item.status !== 'DELIVERED' && (
             <TouchableOpacity
-              style={styles.confirmPaymentButton}
+              style={styles.adjustPaymentButton}
               onPress={() => {
-                setSelectedVehicle(item);
-                setPaymentModalVisible(true);
+                // Calculate current total
+                const currentTotal = item.slotBooking?.services?.reduce((sum: number, svc: any) => 
+                  sum + (svc.pricing?.price || svc.customPrice || 0), 0) || 0;
+                
+                Alert.alert(
+                  'Adjust Payment Amount',
+                  `Current pricing total: ₹${currentTotal}\n\nThis will reset the payment and ask the customer to pay the updated amount. Are you sure?`,
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Adjust Payment',
+                      onPress: () => {
+                        adjustPayment({
+                          variables: { vehicleId: item.id },
+                        });
+                      },
+                    },
+                  ]
+                );
               }}
             >
-              <Text style={styles.confirmPaymentButtonText}>
-                ✓ Confirm Payment Received
-              </Text>
+              <Text style={styles.adjustPaymentButtonText}>💰 Adjust Payment</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Confirm Bill button when all services completed but not ready for pickup */}
+          {item.slotBooking?.services && 
+           item.slotBooking.services.length > 0 && 
+           item.slotBooking.services.every((s: any) => s.status === 'COMPLETED' || s.status === 'CANCELLED') &&
+           item.status !== 'READY_FOR_PICKUP' && 
+           item.status !== 'DELIVERED' && (
+            <TouchableOpacity
+              style={styles.confirmBillButton}
+              onPress={() => {
+                // Calculate total
+                const total = item.slotBooking.services.reduce((sum: number, svc: any) => 
+                  sum + (svc.pricing?.price || svc.customPrice || 0), 0);
+                
+                // Check if all completed services have pricing
+                const completedServices = item.slotBooking.services.filter((s: any) => s.status === 'COMPLETED');
+                const missingPricing = completedServices.filter((s: any) => !s.pricing && !s.customPrice);
+                
+                if (missingPricing.length > 0) {
+                  Alert.alert(
+                    'Pricing Required',
+                    `Please set pricing for ${missingPricing.length} service(s) before confirming the bill.`,
+                    [{ text: 'OK' }]
+                  );
+                  return;
+                }
+                
+                Alert.alert(
+                  'Confirm Bill',
+                  `Total Amount: ₹${total}\n\nThis will mark the vehicle as Ready for Pickup and notify the customer to make payment. Continue?`,
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Confirm Bill',
+                      onPress: () => {
+                        confirmBill({
+                          variables: { vehicleId: item.id },
+                        });
+                      },
+                    },
+                  ]
+                );
+              }}
+            >
+              <Text style={styles.confirmBillButtonText}>✓ Confirm Bill & Notify Customer</Text>
             </TouchableOpacity>
           )}
 
@@ -568,8 +1010,8 @@ export default function WashCycleScreen({ navigation }: any) {
         animationType="slide"
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+        <View style={styles.modalOverlay} pointerEvents="box-none">
+          <View style={styles.modalContent} pointerEvents="auto">
             <Text style={styles.modalTitle}>Update Status</Text>
 
             {selectedVehicle && (
@@ -657,6 +1099,219 @@ export default function WashCycleScreen({ navigation }: any) {
         />
       )}
 
+      {/* Pricing Category Selection Modal */}
+      <Modal
+        visible={pricingModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPricingModalVisible(false)}
+      >
+        <View style={styles.modalOverlay} pointerEvents="box-none">
+          <View style={styles.modalContent} pointerEvents="auto">
+            <Text style={styles.modalTitle}>Select Pricing Category</Text>
+            <Text style={styles.modalSubtitle}>
+              Vehicle: {selectedVehicle?.vehicleNumber}
+              {selectedService && ` - ${
+                selectedService.serviceType === 'CAR_WASH' ? 'Car Wash' :
+                selectedService.serviceType === 'TWO_WHEELER_WASH' ? 'Two Wheeler Wash' :
+                'Body Repair'
+              }`}
+            </Text>
+
+            <View style={styles.pricingOptions}>
+              {updatingServicePricing && (
+                <View style={styles.loadingOverlay}>
+                  <ActivityIndicator size="large" color="#8B5CF6" />
+                  <Text style={styles.loadingText}>Updating pricing...</Text>
+                </View>
+              )}
+              {!pricingData?.pricing || pricingData.pricing.length === 0 ? (
+                <Text style={styles.noPricingText}>No pricing categories available</Text>
+              ) : (
+                pricingData.pricing
+                  ?.filter((p: any) => {
+                    // Filter pricing based on service type if selecting for specific service
+                    if (selectedService) {
+                      if (selectedService.serviceType === 'CAR_WASH') {
+                        return p.vehicleType === 'CAR' || p.vehicleType === selectedVehicle?.vehicleType;
+                      } else if (selectedService.serviceType === 'TWO_WHEELER_WASH') {
+                        return p.vehicleType === 'TWO_WHEELER';
+                      } else if (selectedService.serviceType === 'BODY_REPAIR') {
+                        return p.vehicleType === 'BODY_REPAIR' || p.vehicleType === 'PAINTING';
+                      }
+                    }
+                    // Filter for vehicle-level pricing
+                    if (selectedVehicle?.serviceType === 'BODY_REPAIR') {
+                      return p.vehicleType === 'BODY_REPAIR';
+                    } else if (selectedVehicle?.serviceType === 'WASH') {
+                      return p.vehicleType === selectedVehicle?.vehicleType;
+                    }
+                    return true;
+                  })
+                  .map((pricing: any) => {
+                    const isSelected = selectedService 
+                      ? selectedService.pricing?.id === pricing.id
+                      : selectedVehicle?.pricing?.id === pricing.id;
+                      
+                    return (
+                    <TouchableOpacity
+                      key={pricing.id}
+                      style={[
+                        styles.pricingOption,
+                        isSelected && styles.pricingOptionSelected,
+                      ]}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        console.log('Pricing option pressed:', pricing.categoryName, pricing.id);
+                        if (selectedService) {
+                          console.log('Updating service pricing for service:', selectedService.id);
+                          // Update service pricing
+                          updateServicePricing({
+                            variables: {
+                              input: {
+                                serviceId: selectedService.id,
+                                pricingId: pricing.id,
+                              },
+                            },
+                          }).catch((err) => {
+                            console.error('Mutation error:', err);
+                            Alert.alert('Error', `Failed to update pricing: ${err.message}`);
+                          });
+                        } else {
+                          console.log('Updating vehicle pricing for vehicle:', selectedVehicle.id);
+                          // Update vehicle pricing (legacy)
+                          updateVehiclePricing({
+                            variables: {
+                              input: {
+                                vehicleId: selectedVehicle.id,
+                                pricingId: pricing.id,
+                              },
+                            },
+                          }).catch((err) => {
+                            console.error('Mutation error:', err);
+                            Alert.alert('Error', `Failed to update pricing: ${err.message}`);
+                          });
+                        }
+                      }}
+                    >
+                      <View style={styles.pricingOptionLeft}>
+                        <Text style={styles.pricingOptionName}>{pricing.categoryName}</Text>
+                        {pricing.description && (
+                          <Text style={styles.pricingOptionDescription}>{pricing.description}</Text>
+                        )}
+                      </View>
+                      <Text style={styles.pricingOptionPrice}>₹{pricing.price}</Text>
+                    </TouchableOpacity>
+                  );
+                  })
+              )}
+            </View>
+
+            {/* Custom Pricing Option */}
+            {selectedService && (
+              <TouchableOpacity
+                style={styles.customPricingButton}
+                onPress={() => {
+                  setPricingModalVisible(false);
+                  setCustomPriceModalVisible(true);
+                }}
+              >
+                <Text style={styles.customPricingButtonText}>💰 Enter Custom Amount</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={styles.closePricingButton}
+              onPress={() => setPricingModalVisible(false)}
+            >
+              <Text style={styles.closePricingButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Custom Pricing Modal */}
+      <Modal
+        visible={customPriceModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setCustomPriceModalVisible(false)}
+      >
+        <View style={styles.modalOverlay} pointerEvents="box-none">
+          <View style={styles.modalContent} pointerEvents="auto">
+            <Text style={styles.modalTitle}>Enter Custom Amount</Text>
+            <Text style={styles.modalSubtitle}>
+              Vehicle: {selectedVehicle?.vehicleNumber}
+              {selectedService && ` - ${
+                selectedService.serviceType === 'CAR_WASH' ? 'Car Wash' :
+                selectedService.serviceType === 'TWO_WHEELER_WASH' ? 'Two Wheeler Wash' :
+                'Body Repair'
+              }`}
+            </Text>
+
+            <TextInput
+              style={styles.customPriceInput}
+              placeholder="Pricing Name (e.g., Special Service)"
+              value={customPricingName}
+              onChangeText={setCustomPricingName}
+              placeholderTextColor="#9CA3AF"
+            />
+
+            <TextInput
+              style={styles.customPriceInput}
+              placeholder="Enter amount (₹)"
+              value={customPrice}
+              onChangeText={setCustomPrice}
+              keyboardType="numeric"
+              placeholderTextColor="#9CA3AF"
+            />
+
+            <View style={styles.customPriceButtons}>
+              <TouchableOpacity
+                style={styles.customPriceCancelButton}
+                onPress={() => {
+                  setCustomPriceModalVisible(false);
+                  setCustomPrice('');
+                  setCustomPricingName('');
+                }}
+              >
+                <Text style={styles.customPriceCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.customPriceSaveButton,
+                  !customPrice && styles.customPriceSaveButtonDisabled
+                ]}
+                disabled={!customPrice}
+                onPress={() => {
+                  const amount = parseFloat(customPrice);
+                  if (isNaN(amount) || amount <= 0) {
+                    Alert.alert('Invalid Amount', 'Please enter a valid amount');
+                    return;
+                  }
+
+                  updateServicePricing({
+                    variables: {
+                      input: {
+                        serviceId: selectedService.id,
+                        customPrice: amount,
+                        customPricingName: customPricingName || 'Custom',
+                      },
+                    },
+                  });
+                  setCustomPriceModalVisible(false);
+                  setCustomPrice('');
+                  setCustomPricingName('');
+                }}
+              >
+                <Text style={styles.customPriceSaveButtonText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Service Update Modal */}
       <Modal
         visible={serviceModalVisible}
@@ -664,8 +1319,8 @@ export default function WashCycleScreen({ navigation }: any) {
         animationType="slide"
         onRequestClose={() => setServiceModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+        <View style={styles.modalOverlay} pointerEvents="box-none">
+          <View style={styles.modalContent} pointerEvents="auto">
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Update Service Status</Text>
               <TouchableOpacity
@@ -1053,10 +1708,59 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 8,
-    marginTop: 12,
+    flex: 1,
+    marginRight: 8,
     alignItems: 'center',
   },
   confirmPaymentButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  paymentActions: {
+    flexDirection: 'row',
+    marginTop: 12,
+  },
+  resetPaymentButton: {
+    backgroundColor: '#FEF3C7',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+    alignItems: 'center',
+  },
+  resetPaymentButtonText: {
+    color: '#D97706',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  adjustPaymentButton: {
+    backgroundColor: '#EFF6FF',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#3B82F6',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  adjustPaymentButtonText: {
+    color: '#3B82F6',
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  confirmBillButton: {
+    backgroundColor: '#10B981',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 12,
+    borderWidth: 2,
+    borderColor: '#059669',
+  },
+  confirmBillButtonText: {
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 14,
@@ -1211,5 +1915,243 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#9CA3AF',
     fontWeight: 'bold',
+  },
+  // Pricing styles
+  pricingRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  pricingText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#10B981',
+  },
+  servicePricingButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  changePricingButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#3B82F6',
+  },
+  changePricingButtonText: {
+    fontSize: 12,
+    color: '#3B82F6',
+    fontWeight: '600',
+  },
+  resetServicePricingButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#EF4444',
+  },
+  resetServicePricingButtonText: {
+    fontSize: 12,
+    color: '#EF4444',
+    fontWeight: '600',
+  },
+  selectPricingButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  selectPricingButtonText: {
+    fontSize: 13,
+    color: '#D97706',
+    fontWeight: '600',
+  },
+  pricingOptions: {
+    maxHeight: 400,
+    position: 'relative',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+    borderRadius: 8,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#8B5CF6',
+    fontWeight: '600',
+  },
+  noPricingText: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    padding: 20,
+  },
+  pricingOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    marginBottom: 8,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+  },
+  pricingOptionSelected: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#3B82F6',
+  },
+  pricingOptionLeft: {
+    flex: 1,
+  },
+  pricingOptionName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 2,
+  },
+  pricingOptionDescription: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  pricingOptionPrice: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#10B981',
+    marginLeft: 12,
+  },
+  closePricingButton: {
+    backgroundColor: '#6B7280',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  closePricingButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 16,
+  },
+  servicePricingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  servicePricingLabel: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  servicePricingText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#10B981',
+    flex: 1,
+  },
+  changeServicePricingButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#3B82F6',
+    marginLeft: 8,
+  },
+  changeServicePricingButtonText: {
+    fontSize: 11,
+    color: '#3B82F6',
+    fontWeight: '600',
+  },
+  selectServicePricingButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  selectServicePricingButtonText: {
+    fontSize: 12,
+    color: '#D97706',
+    fontWeight: '600',
+  },
+  estimatedAmount: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#F59E0B',
+  },
+  customPricingButton: {
+    backgroundColor: '#10B981',
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  customPricingButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 15,
+  },
+  customPriceInput: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 15,
+    marginBottom: 12,
+    backgroundColor: '#F9FAFB',
+  },
+  customPriceButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  customPriceCancelButton: {
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  customPriceCancelButtonText: {
+    color: '#6B7280',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  customPriceSaveButton: {
+    flex: 1,
+    backgroundColor: '#10B981',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  customPriceSaveButtonDisabled: {
+    backgroundColor: '#D1D5DB',
+  },
+  customPriceSaveButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
   },
 });

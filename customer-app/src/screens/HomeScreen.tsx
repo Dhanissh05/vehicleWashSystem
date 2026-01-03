@@ -247,6 +247,45 @@ export default function HomeScreen({ navigation }: any) {
           </Text>
         )}
 
+        {/* Show pricing breakdown for multiple services */}
+        {item.slotBooking?.services && item.slotBooking.services.length > 0 && (
+          <View style={styles.pricingBreakdown}>
+            <Text style={styles.pricingBreakdownTitle}>Services:</Text>
+            {item.slotBooking.services.map((service: any) => (
+              (service.pricing || service.customPrice) && (
+                <View key={service.id} style={styles.pricingBreakdownItem}>
+                  <Text style={styles.pricingBreakdownService}>
+                    {service.serviceType === 'CAR_WASH' ? '🚗 Car Wash' :
+                     service.serviceType === 'TWO_WHEELER_WASH' ? '🏍️ Two Wheeler' :
+                     '🔧 Body Repair'}
+                    {' - '}{service.pricing?.categoryName || service.customPricingName || 'Custom'}
+                  </Text>
+                  <Text style={styles.pricingBreakdownPrice}>₹{service.pricing?.price || service.customPrice}</Text>
+                </View>
+              )
+            ))}
+            {/* Total Amount */}
+            {(() => {
+              const total = item.slotBooking.services.reduce((sum: number, service: any) => {
+                return sum + (service.pricing?.price || service.customPrice || 0);
+              }, 0);
+              return total > 0 ? (
+                <View style={styles.totalAmountContainer}>
+                  <Text style={styles.totalAmountLabel}>Total:</Text>
+                  <Text style={styles.totalAmount}>₹{total}</Text>
+                </View>
+              ) : null;
+            })()}
+          </View>
+        )}
+
+        {/* Show single pricing for single service */}
+        {item.pricing && (!item.slotBooking?.services || item.slotBooking.services.length <= 1) && (
+          <Text style={styles.pricingInfo}>
+            📋 Category: {item.pricing.categoryName}
+          </Text>
+        )}
+
         {item.payment && (
           <View style={styles.paymentInfo}>
             <Text style={styles.paymentAmount}>₹{item.payment.amount}</Text>
@@ -450,13 +489,23 @@ export default function HomeScreen({ navigation }: any) {
           visible={paymentModalVisible}
           onClose={() => setPaymentModalVisible(false)}
           vehicleId={selectedVehicle.id}
-          amount={
-            pricingData?.pricing?.find(
-              (p: any) =>
-                p.vehicleType === selectedVehicle.vehicleType &&
-                p.carCategory === selectedVehicle.carCategory
-            )?.price || 0
-          }
+          amount={(() => {
+            // Calculate total from service pricing if available
+            if (selectedVehicle.slotBooking?.services) {
+              const total = selectedVehicle.slotBooking.services.reduce(
+                (sum: number, svc: any) => sum + (svc.pricing?.price || svc.customPrice || 0), 
+                0
+              );
+              if (total > 0) return total;
+            }
+            // Fallback to vehicle pricing or default pricing
+            return selectedVehicle.pricing?.price ||
+              pricingData?.pricing?.find(
+                (p: any) =>
+                  p.vehicleType === selectedVehicle.vehicleType &&
+                  p.carCategory === selectedVehicle.carCategory
+              )?.price || 0;
+          })()}
           onPaymentInitiated={(paymentId, method) => {
             setSelectedPaymentId(paymentId);
             if (method === 'ONLINE') {
@@ -488,13 +537,23 @@ export default function HomeScreen({ navigation }: any) {
           visible={onlinePaymentModalVisible}
           onClose={() => setOnlinePaymentModalVisible(false)}
           paymentId={selectedPaymentId}
-          amount={
-            pricingData?.pricing?.find(
-              (p: any) =>
-                p.vehicleType === selectedVehicle.vehicleType &&
-                p.carCategory === selectedVehicle.carCategory
-            )?.price || 0
-          }
+          amount={(() => {
+            // Calculate total from service pricing if available
+            if (selectedVehicle.slotBooking?.services) {
+              const total = selectedVehicle.slotBooking.services.reduce(
+                (sum: number, svc: any) => sum + (svc.pricing?.price || svc.customPrice || 0), 
+                0
+              );
+              if (total > 0) return total;
+            }
+            // Fallback to vehicle pricing or default pricing
+            return selectedVehicle.pricing?.price ||
+              pricingData?.pricing?.find(
+                (p: any) =>
+                  p.vehicleType === selectedVehicle.vehicleType &&
+                  p.carCategory === selectedVehicle.carCategory
+              )?.price || 0;
+          })()}
           vehicleNumber={selectedVehicle.vehicleNumber}
           onPaymentSuccess={() => {
             refetch();
@@ -735,6 +794,61 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     marginBottom: 8,
+  },
+  pricingInfo: {
+    fontSize: 14,
+    color: '#3B82F6',
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  pricingBreakdown: {
+    marginBottom: 12,
+    padding: 12,
+    backgroundColor: '#F0F9FF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  pricingBreakdownTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1E40AF',
+    marginBottom: 8,
+  },
+  pricingBreakdownItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  pricingBreakdownService: {
+    fontSize: 13,
+    color: '#1F2937',
+    flex: 1,
+  },
+  pricingBreakdownPrice: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#10B981',
+  },
+  totalAmountContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#BFDBFE',
+  },
+  totalAmountLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1E40AF',
+  },
+  totalAmount: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#10B981',
   },
   paymentInfo: {
     flexDirection: 'row',

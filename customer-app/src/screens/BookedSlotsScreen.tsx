@@ -422,19 +422,6 @@ const styles = StyleSheet.create({
     color: '#8B5CF6',
     fontWeight: '600',
   },
-  tableLabel: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
-    flex: 1,
-  },
-  tableValue: {
-    fontSize: 14,
-    color: '#1A1A1A',
-    fontWeight: '600',
-    flex: 2,
-    textAlign: 'right',
-  },
 });
 
 export default BookedSlotsScreen;

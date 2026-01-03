@@ -43,9 +43,9 @@ export default function BookingNotificationListener() {
     return () => clearInterval(interval);
   }, []);
 
-  const { data } = useQuery(SLOT_BOOKINGS_COUNT, {
-    fetchPolicy: 'network-only',
-    pollInterval: 3000, // Poll every 3 seconds for instant detection
+  const { data, error } = useQuery(SLOT_BOOKINGS_COUNT, {
+    fetchPolicy: 'cache-and-network',
+    pollInterval: error ? 0 : 3000, // Stop polling if there's an error (e.g., not authenticated)
     errorPolicy: 'ignore',
   });
 

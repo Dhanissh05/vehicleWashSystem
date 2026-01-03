@@ -40,9 +40,10 @@ export default function DashboardScreen({ navigation }: any) {
     title: string;
   } | null>(null);
 
-  const { data, loading, refetch } = useQuery(DASHBOARD_METRICS, {
-    pollInterval: 60000, // Refresh every 60 seconds
+  const { data, loading, refetch, error } = useQuery(DASHBOARD_METRICS, {
+    pollInterval: error ? 0 : 60000, // Stop polling if there's an error
     errorPolicy: 'ignore',
+    fetchPolicy: 'cache-and-network',
   });
 
   const metrics = data?.dashboardMetrics;
