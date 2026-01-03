@@ -113,6 +113,16 @@ export default function AddVehicleScreen({ navigation }: any) {
       return;
     }
 
+    // Check if vehicle is already active (not DELIVERED)
+    if (foundVehicle && foundVehicle.status !== 'DELIVERED') {
+      Alert.alert(
+        'Vehicle Already Active',
+        `This vehicle (${vehicleNumber}) is already in the system with status "${foundVehicle.status}". A vehicle can only be re-entered after it has been delivered.\n\nCurrent Status: ${foundVehicle.status}\nCustomer: ${foundVehicle.customer?.name || 'N/A'}\nMobile: ${foundVehicle.customer?.mobile}`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     try {
       await addVehicle({
         variables: {
@@ -185,8 +195,20 @@ export default function AddVehicleScreen({ navigation }: any) {
             </View>
           )}
           {foundVehicle && (
-            <View style={styles.foundVehicleBox}>
-              <Text style={styles.foundVehicleTitle}>✓ Vehicle Found in System</Text>
+            <View style={[
+              styles.foundVehicleBox,
+              foundVehicle.status !== 'DELIVERED' && styles.foundVehicleWarning
+            ]}>
+              {foundVehicle.status !== 'DELIVERED' ? (
+                <>
+                  <Text style={styles.foundVehicleWarningTitle}>⚠️ Vehicle Already Active</Text>
+                  <Text style={styles.foundVehicleWarningText}>
+                    This vehicle cannot be added again until it is delivered.
+                  </Text>
+                </>
+              ) : (
+                <Text style={styles.foundVehicleTitle}>✓ Vehicle Found in System</Text>
+              )}
               <Text style={styles.foundVehicleText}>
                 Customer: {foundVehicle.customer?.name || 'N/A'}
               </Text>
@@ -196,8 +218,11 @@ export default function AddVehicleScreen({ navigation }: any) {
               <Text style={styles.foundVehicleText}>
                 Previous Washes: {foundVehicle.washCount} times
               </Text>
-              <Text style={styles.foundVehicleText}>
-                Status: {foundVehicle.status}
+              <Text style={[
+                styles.foundVehicleText,
+                foundVehicle.status !== 'DELIVERED' && styles.foundVehicleStatusWarning
+              ]}>
+                Current Status: {foundVehicle.status}
               </Text>
             </View>
           )}
@@ -440,15 +465,35 @@ const styles = StyleSheet.create({
     padding: 12,
     marginTop: 8,
   },
+  foundVehicleWarning: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#F59E0B',
+  },
   foundVehicleTitle: {
     fontSize: 14,
     fontWeight: 'bold',
     color: '#065F46',
     marginBottom: 8,
   },
+  foundVehicleWarningTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#92400E',
+    marginBottom: 8,
+  },
   foundVehicleText: {
     fontSize: 13,
     color: '#047857',
     marginBottom: 4,
+  },
+  foundVehicleWarningText: {
+    fontSize: 13,
+    color: '#92400E',
+    marginBottom: 8,
+    fontStyle: 'italic',
+  },
+  foundVehicleStatusWarning: {
+    color: '#92400E',
+    fontWeight: 'bold',
   },
 });
