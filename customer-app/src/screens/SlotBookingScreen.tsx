@@ -89,10 +89,24 @@ const SlotBookingScreen = ({ navigation }: any) => {
     };
   }, []);
 
+  // Remove duplicate vehicles by vehicle number
+  const getUniqueVehicles = (vehicles: any[]) => {
+    if (!vehicles) return [];
+    const seen = new Set();
+    return vehicles.filter((vehicle: any) => {
+      if (seen.has(vehicle.vehicleNumber)) {
+        return false;
+      }
+      seen.add(vehicle.vehicleNumber);
+      return true;
+    });
+  };
+
   // Auto-fetch vehicle details when vehicle number is typed
   useEffect(() => {
     if (vehicleNumber && vehicleNumber.length >= 4 && vehiclesData?.myVehicles) {
-      const matchedVehicle = vehiclesData.myVehicles.find(
+      const uniqueVehicles = getUniqueVehicles(vehiclesData.myVehicles);
+      const matchedVehicle = uniqueVehicles.find(
         (v: any) => v.vehicleNumber.toUpperCase() === vehicleNumber.toUpperCase()
       );
       
@@ -403,7 +417,8 @@ const SlotBookingScreen = ({ navigation }: any) => {
                     setPhotoUrl(null);
                   } else {
                     // Find and select existing vehicle
-                    const vehicle = vehiclesData.myVehicles.find((v: any) => v.vehicleNumber === value);
+                    const uniqueVehicles = getUniqueVehicles(vehiclesData.myVehicles);
+                    const vehicle = uniqueVehicles.find((v: any) => v.vehicleNumber === value);
                     if (vehicle) {
                       handleSelectVehicle(vehicle);
                     }
@@ -411,7 +426,7 @@ const SlotBookingScreen = ({ navigation }: any) => {
                 }}
                 style={styles.picker}
               >
-                {vehiclesData.myVehicles.map((vehicle: any) => (
+                {getUniqueVehicles(vehiclesData.myVehicles).map((vehicle: any) => (
                   <Picker.Item 
                     key={vehicle.id}
                     label={`${vehicle.vehicleNumber} - ${vehicle.brand || 'Vehicle'} ${vehicle.model || ''}`}
@@ -438,7 +453,8 @@ const SlotBookingScreen = ({ navigation }: any) => {
                 style={styles.switchButton}
                 onPress={() => {
                   // Switch back to picker with first vehicle
-                  const firstVehicle = vehiclesData.myVehicles[0];
+                  const uniqueVehicles = getUniqueVehicles(vehiclesData.myVehicles);
+                  const firstVehicle = uniqueVehicles[0];
                   handleSelectVehicle(firstVehicle);
                 }}
               >
