@@ -183,7 +183,7 @@ model Payment {
 model Pricing {
   id              String          @id @default(uuid())
   vehicleType     String          // VehicleType: CAR, TWO_WHEELER, BODY_REPAIR, PAINTING
-  categoryName    String          // Custom category name (e.g., "Sedan", "Bike Above 150cc", "Full Body Paint")
+  categoryName    String          @default("Standard") // Custom category name (e.g., "Sedan", "Bike Above 150cc", "Full Body Paint")
   carCategory     String?         // CarCategory: SEDAN, SUV, HATCHBACK, HYBRID (Deprecated, kept for backward compatibility)
   price           Float
   description     String?
