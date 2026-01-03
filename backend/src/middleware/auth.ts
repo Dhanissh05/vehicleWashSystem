@@ -9,6 +9,7 @@ export interface AuthRequest extends Request {
     id: string;
     mobile: string;
     role: string;
+    centerId?: string;  // Multi-tenant: User's center ID
   };
 }
 
@@ -50,18 +51,19 @@ export const authenticate = async (
     // Verify user still exists and is active
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
-      select: { id: true, mobile: true, role: true, isActive: true },
+      select: { id: true, mobile: true, role: true, isActive: true, centerId: true },
     });
 
     if (!user || !user.isActive) {
       return res.status(401).json({ error: 'User not found or inactive' });
     }
 
-    // Attach user to request
+    // Attach user to request (including centerId for multi-tenant)
     req.user = {
       id: user.id,
       mobile: user.mobile,
       role: user.role,
+      centerId: user.centerId || undefined,
     };
 
     next();
