@@ -12,6 +12,8 @@ export const typeDefs = gql`
   enum VehicleType {
     CAR
     TWO_WHEELER
+    BODY_REPAIR
+    PAINTING
   }
 
   enum CarCategory {
@@ -125,6 +127,7 @@ export const typeDefs = gql`
     bodyRepairPaintingAt: DateTime
     bodyRepairCompleteAt: DateTime
     notes: String
+    pricing: Pricing
     customer: User!
     worker: User
     payment: Payment
@@ -158,6 +161,7 @@ export const typeDefs = gql`
   type Pricing {
     id: ID!
     vehicleType: VehicleType!
+    categoryName: String!
     carCategory: CarCategory
     price: Float!
     description: String
@@ -225,10 +229,29 @@ export const typeDefs = gql`
     notes: String
   }
 
-  input UpdatePricingInput {
+  input UpdateVehiclePricingInput {
+    vehicleId: ID!
+    pricingId: ID!
+  }
+
+  input UpdateServicePricingInput {
+    serviceId: ID!
+    pricingId: ID
+    customPrice: Float
+    customPricingName: String
+  }
+
+  input CreatePricingInput {
     vehicleType: VehicleType!
-    carCategory: CarCategory
+    categoryName: String!
     price: Float!
+    description: String
+  }
+
+  input UpdatePricingInput {
+    id: ID!
+    categoryName: String
+    price: Float
     description: String
   }
 
@@ -246,6 +269,7 @@ export const typeDefs = gql`
   input CreatePaymentInput {
     vehicleId: ID!
     method: PaymentMethod!
+    expectedAmount: Float
   }
 
   input ConfirmManualPaymentInput {
@@ -344,6 +368,9 @@ export const typeDefs = gql`
     slotBookingId: String!
     serviceType: SlotServiceType!
     status: SlotServiceStatus!
+    pricing: Pricing
+    customPrice: Float
+    customPricingName: String
     startedAt: DateTime
     startedBy: String
     completedAt: DateTime
@@ -450,6 +477,11 @@ export const typeDefs = gql`
     # System Config
     systemConfig(key: String!): SystemConfig
     
+    # Estimations
+    estimations(status: EstimationStatus, limit: Int, offset: Int): [Estimation!]!
+    estimation(id: ID!): Estimation
+    estimationByNumber(estimationNumber: String!): Estimation
+    
     # App Version
     appVersion: AppVersion!
   }
@@ -474,9 +506,12 @@ export const typeDefs = gql`
     # Vehicle Management
     addVehicle(input: AddVehicleInput!): Vehicle!
     updateVehicleStatus(input: UpdateVehicleStatusInput!): Vehicle!
+    updateVehiclePricing(input: UpdateVehiclePricingInput!): Vehicle!
+    updateServicePricing(input: UpdateServicePricingInput!): SlotService!
     assignVehicleToWorker(vehicleId: ID!, workerId: ID!): Vehicle!
 
     # Pricing
+    createPricing(input: CreatePricingInput!): Pricing!
     updatePricing(input: UpdatePricingInput!): Pricing!
     deletePricing(id: ID!): Boolean!
 
@@ -487,6 +522,8 @@ export const typeDefs = gql`
     markPayment(input: MarkPaymentInput!): Payment!
     verifyManualPayment(input: VerifyManualPaymentInput!): Payment!
     createRazorpayOrder(vehicleId: ID!, amount: Float!): String!
+    deletePayment(vehicleId: ID!): Boolean!
+    adjustPayment(vehicleId: ID!): Payment!
 
     # User Management (Admin only)
     createWorker(input: CreateWorkerInput!): WorkerCredentials!
@@ -509,6 +546,7 @@ export const typeDefs = gql`
     # Slot Service Management
     startService(serviceId: ID!): SlotService!
     updateServiceStatus(serviceId: ID!, status: SlotServiceStatus!, notes: String): SlotService!
+    confirmBill(vehicleId: ID!): Vehicle!
     cancelService(serviceId: ID!): SlotService!
 
     # System Config (Admin only)
@@ -516,6 +554,14 @@ export const typeDefs = gql`
 
     # Push Notifications (Admin only)
     sendBroadcastNotification(title: String!, message: String!): BroadcastNotificationResult!
+    
+    # Estimation Management
+    createEstimation(input: CreateEstimationInput!): Estimation!
+    updateEstimation(id: ID!, input: UpdateEstimationInput!): Estimation!
+    deleteEstimation(id: ID!): Boolean!
+    addEstimationItem(input: AddEstimationItemInput!): EstimationItem!
+    updateEstimationItem(id: ID!, input: UpdateEstimationItemInput!): EstimationItem!
+    deleteEstimationItem(id: ID!): Boolean!
   }
 
   type BroadcastNotificationResult {
@@ -523,4 +569,81 @@ export const typeDefs = gql`
     sentCount: Int!
     failedCount: Int!
   }
+  
+  enum EstimationStatus {
+    DRAFT
+    SENT
+    ACCEPTED
+    REJECTED
+  }
+  
+  type Estimation {
+    id: ID!
+    estimationNumber: String!
+    customerName: String!
+    customerMobile: String!
+    vehicleNumber: String
+    vehicleType: String
+    center: Center
+    preparedBy: String!
+    preparedByName: String!
+    preparedByRole: String!
+    termsAndConditions: String
+    notes: String
+    status: EstimationStatus!
+    totalAmount: Float!
+    validUntil: DateTime
+    items: [EstimationItem!]!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+  }
+  
+  type EstimationItem {
+    id: ID!
+    estimationId: String!
+    serviceName: String!
+    description: String
+    quantity: Int!
+    unitPrice: Float!
+    totalPrice: Float!
+    createdAt: DateTime!
+  }
+  
+  input CreateEstimationInput {
+    customerName: String!
+    customerMobile: String!
+    vehicleNumber: String
+    vehicleType: String
+    centerId: String
+    termsAndConditions: String
+    notes: String
+    validUntil: DateTime
+  }
+  
+  input UpdateEstimationInput {
+    customerName: String
+    customerMobile: String
+    vehicleNumber: String
+    vehicleType: String
+    termsAndConditions: String
+    notes: String
+    status: EstimationStatus
+    validUntil: DateTime
+  }
+  
+  input AddEstimationItemInput {
+    estimationId: ID!
+    serviceName: String!
+    description: String
+    quantity: Int!
+    unitPrice: Float!
+  }
+  
+  input UpdateEstimationItemInput {
+    serviceName: String
+    description: String
+    quantity: Int
+    unitPrice: Float
+  }
 `;
+

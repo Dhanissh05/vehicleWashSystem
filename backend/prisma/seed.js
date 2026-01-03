@@ -59,19 +59,18 @@ async function main() {
   });
   console.log('✅ Wash center created:', center.name);
 
-  // Create Pricing
+  // Create Pricing with new categoryName field
   const pricingData = [
-    { id: 'pricing-two-wheeler', vehicleType: 'TWO_WHEELER', carCategory: null, price: 100, description: 'Two Wheeler Wash' },
-    { id: 'pricing-hatchback', vehicleType: 'CAR', carCategory: 'HATCHBACK', price: 300, description: 'Hatchback Wash' },
-    { id: 'pricing-sedan', vehicleType: 'CAR', carCategory: 'SEDAN', price: 400, description: 'Sedan Wash' },
-    { id: 'pricing-suv', vehicleType: 'CAR', carCategory: 'SUV', price: 500, description: 'SUV Wash' },
-    { id: 'pricing-hybrid', vehicleType: 'CAR', carCategory: 'HYBRID', price: 450, description: 'Hybrid Wash' },
+    { id: 'pricing-two-wheeler', vehicleType: 'TWO_WHEELER', categoryName: 'Two Wheeler', carCategory: null, price: 100, description: 'Two Wheeler Wash' },
+    { id: 'pricing-hatchback', vehicleType: 'CAR', categoryName: 'Hatchback', carCategory: 'HATCHBACK', price: 300, description: 'Hatchback Wash' },
+    { id: 'pricing-sedan', vehicleType: 'CAR', categoryName: 'Sedan', carCategory: 'SEDAN', price: 400, description: 'Sedan Wash' },
+    { id: 'pricing-suv', vehicleType: 'CAR', categoryName: 'SUV', carCategory: 'SUV', price: 500, description: 'SUV Wash' },
   ];
 
   for (const pricing of pricingData) {
     await prisma.pricing.upsert({
       where: { id: pricing.id },
-      update: { price: pricing.price },
+      update: { price: pricing.price, categoryName: pricing.categoryName },
       create: pricing,
     });
   }

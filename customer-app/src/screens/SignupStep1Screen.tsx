@@ -10,10 +10,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Image,
 } from 'react-native';
-import { useLazyQuery } from '@apollo/client';
+import { useLazyQuery, useQuery } from '@apollo/client';
 import { LinearGradient } from 'expo-linear-gradient';
-import { CHECK_USER_EXISTS } from '../apollo/queries';
+import { CHECK_USER_EXISTS, CENTERS } from '../apollo/queries';
 
 interface SignupStep1Props {
   navigation: any;
@@ -32,6 +33,9 @@ export default function SignupStep1Screen({ navigation }: SignupStep1Props) {
   const [errors, setErrors] = useState<any>({});
 
   const [checkUserExists, { loading }] = useLazyQuery(CHECK_USER_EXISTS);
+  const { data: centerData } = useQuery(CENTERS);
+  
+  const center = centerData?.centers?.[0];
 
   // Client-side validation
   const validate = () => {
@@ -140,9 +144,18 @@ export default function SignupStep1Screen({ navigation }: SignupStep1Props) {
             <Text style={styles.backButtonText}>← Back</Text>
           </TouchableOpacity>
 
-          <View style={styles.iconContainer}>
-            <Text style={styles.iconText}>✨</Text>
-          </View>
+          {center?.logoUrl ? (
+            <Image 
+              source={{ uri: center.logoUrl }} 
+              style={styles.centerLogo}
+              resizeMode="contain"
+            />
+          ) : (
+            <View style={styles.iconContainer}>
+              <Text style={styles.iconText}>✨</Text>
+            </View>
+          )}
+          <Text style={styles.centerName}>{center?.name || 'Vehicle Wash'}</Text>
           <Text style={styles.title}>Create Account</Text>
           <Text style={styles.subtitle}>Sign up to get started</Text>
         </LinearGradient>
@@ -323,6 +336,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
+  },
+  centerLogo: {
+    width: 80,
+    height: 80,
+    marginBottom: 12,
+  },
+  centerName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 4,
   },
   iconText: {
     fontSize: 40,

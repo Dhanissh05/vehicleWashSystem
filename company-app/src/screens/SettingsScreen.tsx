@@ -196,26 +196,85 @@ export default function SettingsScreen({ navigation }: any) {
         
         setUploadingLogo(true);
         
-        // In a real app, you would upload to a storage service (AWS S3, Cloudinary, etc.)
-        // For now, we'll use the local URI (in production, replace with actual upload)
+        // Upload file to server
+          const formData = new FormData();
+          const filename = imageUri.split('/').pop() || 'logo.jpg';
+          
+          // Determine MIME type from file extension
+          const extension = filename.toLowerCase().split('.').pop();
+          let mimeType = 'image/jpeg';
+          if (extension === 'png') mimeType = 'image/png';
+          else if (extension === 'webp') mimeType = 'image/webp';
+          else if (extension === 'jpg' || extension === 'jpeg') mimeType = 'image/jpeg';
+          
+          // Create file object for upload - React Native specific format
+          formData.append('file', {
+            uri: imageUri,
+            type: mimeType,
+            name: filename,
+          } as any);
+
+          const API_URL = process.env.EXPO_PUBLIC_API_URL?.replace('/graphql', '') || 'http://localhost:4000';
+          const token = await AsyncStorage.getItem('token');
+
+          console.log('Uploading to:', `${API_URL}/api/upload/logo`);
+          console.log('File:', filename);
+          console.log('MIME type:', mimeType);
+          console.log('Token exists:', !!token);
+
+          // Upload to server with timeout
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+          const uploadResponse = await fetch(`${API_URL}/api/upload/logo`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              // Don't set Content-Type - let fetch set it automatically for FormData with boundary
+            },
+            body: formData,
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+          console.log('Upload response status:', uploadResponse.status);
+
+          if (!uploadResponse.ok) {
+            const errorText = await uploadResponse.text();
+            console.error('Upload error:', errorText);
+            throw new Error(`Server error: ${uploadResponse.status} - ${errorText}`);
+          }
+
+          const uploadData = await uploadResponse.json();
+          console.log('Upload success:', uploadData);
+        
+        // Update center with the server URL
         await updateLogo({
           variables: {
             input: {
               centerId: center.id,
-              logoUrl: imageUri,
+              logoUrl: uploadData.url,
             },
           },
         });
         
         Alert.alert('Success', 'Logo updated successfully');
-        setUploadingLogo(false);
         refetch();
       }
-    } catch (error) {
-      setUploadingLogo(false);
-      Alert.alert('Error', 'Failed to upload logo');
-      console.error('Logo upload error:', error);
-    }
+    } catch (uploadError: any) {
+        console.error('Upload error:', uploadError);
+        let errorMessage = uploadError.message || 'Failed to upload logo to server';
+        
+        if (uploadError.name === 'AbortError') {
+          errorMessage = 'Upload timeout - server took too long to respond';
+        } else if (errorMessage.includes('Network request failed')) {
+          errorMessage = 'Cannot connect to server.\n\nPossible causes:\n• Backend not running\n• Firewall blocking connection\n• Phone and computer on different WiFi\n• Wrong IP address in .env\n\nCurrent API: ' + (process.env.EXPO_PUBLIC_API_URL || 'Not set');
+        }
+        
+        Alert.alert('Upload Failed', errorMessage);
+      } finally {
+        setUploadingLogo(false);
+      }
   };
 
   const handleEditCenter = () => {

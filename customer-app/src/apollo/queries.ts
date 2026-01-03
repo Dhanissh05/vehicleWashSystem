@@ -166,6 +166,12 @@ export const MY_VEHICLES = gql`
         transactionId
         createdAt
       }
+      pricing {
+        id
+        categoryName
+        price
+        vehicleType
+      }
       slotBooking {
         id
         carWash
@@ -175,6 +181,14 @@ export const MY_VEHICLES = gql`
           id
           serviceType
           status
+          pricing {
+            id
+            categoryName
+            price
+            vehicleType
+          }
+          customPrice
+          customPricingName
           startedAt
           completedAt
           notes

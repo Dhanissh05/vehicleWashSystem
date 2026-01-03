@@ -7,7 +7,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -92,6 +92,7 @@ model Center {
   // Relations
   vehicles      Vehicle[]
   slotBookings  SlotBooking[]
+  estimations   Estimation[]
 }
 
 model Vehicle {
@@ -114,6 +115,10 @@ model Vehicle {
   bodyRepairPaintingAt   DateTime?
   bodyRepairCompleteAt   DateTime?
   notes           String?
+  
+  // Pricing
+  pricing         Pricing?        @relation(fields: [pricingId], references: [id])
+  pricingId       String?
   
   // Relations
   customer        User            @relation("CustomerVehicles", fields: [customerId], references: [id])
@@ -139,6 +144,7 @@ model Vehicle {
   @@index([vehicleType])
   @@index([receivedAt])
   @@index([vehicleNumber])
+  @@index([pricingId])
 }
 
 model Payment {
@@ -176,15 +182,20 @@ model Payment {
 
 model Pricing {
   id              String          @id @default(uuid())
-  vehicleType     String          // VehicleType: CAR, TWO_WHEELER
-  carCategory     String?         // CarCategory: SEDAN, SUV, HATCHBACK, HYBRID (Only for cars)
+  vehicleType     String          // VehicleType: CAR, TWO_WHEELER, BODY_REPAIR, PAINTING
+  categoryName    String          // Custom category name (e.g., "Sedan", "Bike Above 150cc", "Full Body Paint")
+  carCategory     String?         // CarCategory: SEDAN, SUV, HATCHBACK, HYBRID (Deprecated, kept for backward compatibility)
   price           Float
   description     String?
   isActive        Boolean         @default(true)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
+  
+  // Relations
+  vehicles        Vehicle[]
+  slotServices    SlotService[]
 
-  @@unique([vehicleType, carCategory])
+  @@unique([vehicleType, categoryName])
   @@index([vehicleType])
   @@index([isActive])
 }
@@ -248,6 +259,10 @@ model SlotService {
   slotBooking   SlotBooking  @relation(fields: [slotBookingId], references: [id], onDelete: Cascade)
   serviceType   String
   status        String       @default("BOOKED")
+  pricingId     String?
+  pricing       Pricing?     @relation(fields: [pricingId], references: [id], onDelete: SetNull)
+  customPrice   Float?       // Custom price when no pricing category matches
+  customPricingName String?   // Custom pricing description
   startedAt     DateTime?
   startedBy     String?
   completedAt   DateTime?
@@ -263,4 +278,48 @@ model SlotService {
   @@index([slotBookingId])
   @@index([status])
   @@index([serviceType])
+  @@index([pricingId])
+}
+
+model Estimation {
+  id                String            @id @default(uuid())
+  estimationNumber  String            @unique
+  customerName      String
+  customerMobile    String
+  vehicleNumber     String?
+  vehicleType       String?
+  centerId          String?
+  center            Center?           @relation(fields: [centerId], references: [id], onDelete: SetNull)
+  preparedBy        String            // User ID of admin/worker who prepared this
+  preparedByName    String            // Name of admin/worker
+  preparedByRole    String            // ADMIN or WORKER
+  termsAndConditions String?
+  notes             String?
+  status            String            @default("DRAFT") // DRAFT, SENT, ACCEPTED, REJECTED
+  totalAmount       Float             @default(0)
+  validUntil        DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  
+  // Relations
+  items             EstimationItem[]
+  
+  @@index([estimationNumber])
+  @@index([customerMobile])
+  @@index([status])
+  @@index([centerId])
+}
+
+model EstimationItem {
+  id            String      @id @default(uuid())
+  estimationId  String
+  estimation    Estimation  @relation(fields: [estimationId], references: [id], onDelete: Cascade)
+  serviceName   String
+  description   String?
+  quantity      Int         @default(1)
+  unitPrice     Float
+  totalPrice    Float
+  createdAt     DateTime    @default(now())
+  
+  @@index([estimationId])
 }

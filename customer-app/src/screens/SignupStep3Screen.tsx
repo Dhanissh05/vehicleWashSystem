@@ -10,8 +10,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Image,
 } from 'react-native';
+import { useQuery } from '@apollo/client';
 import { LinearGradient } from 'expo-linear-gradient';
+import { CENTERS } from '../apollo/queries';
 
 interface SignupStep3Props {
   navigation: any;
@@ -30,6 +33,9 @@ export default function SignupStep3Screen({ navigation, route }: SignupStep3Prop
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<any>({});
+
+  const { data: centerData } = useQuery(CENTERS);
+  const center = centerData?.centers?.[0];
 
   // Password strength validation
   const validatePassword = () => {
@@ -116,9 +122,18 @@ export default function SignupStep3Screen({ navigation, route }: SignupStep3Prop
             <Text style={styles.backButtonText}>← Back</Text>
           </TouchableOpacity>
 
-          <View style={styles.iconContainer}>
-            <Text style={styles.iconText}>🔐</Text>
-          </View>
+          {center?.logoUrl ? (
+            <Image 
+              source={{ uri: center.logoUrl }} 
+              style={styles.centerLogo}
+              resizeMode="contain"
+            />
+          ) : (
+            <View style={styles.iconContainer}>
+              <Text style={styles.iconText}>🔐</Text>
+            </View>
+          )}
+          <Text style={styles.centerName}>{center?.name || 'Vehicle Wash'}</Text>
           <Text style={styles.title}>Create Password</Text>
           <Text style={styles.subtitle}>Secure your account</Text>
         </LinearGradient>
@@ -253,6 +268,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
+  },
+  centerLogo: {
+    width: 80,
+    height: 80,
+    marginBottom: 12,
+  },
+  centerName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 4,
   },
   iconText: {
     fontSize: 40,

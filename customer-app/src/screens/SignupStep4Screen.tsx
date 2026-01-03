@@ -10,11 +10,12 @@ import {
   Platform,
   ScrollView,
   KeyboardAvoidingView,
+  Image,
 } from 'react-native';
-import { useMutation } from '@apollo/client';
+import { useMutation, useQuery } from '@apollo/client';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SEND_OTP, VERIFY_OTP, UPDATE_USER, UPDATE_PASSWORD } from '../apollo/queries';
+import { SEND_OTP, VERIFY_OTP, UPDATE_USER, UPDATE_PASSWORD, CENTERS } from '../apollo/queries';
 
 interface SignupStep4Props {
   navigation: any;
@@ -39,6 +40,9 @@ export default function SignupStep4Screen({ navigation, route }: SignupStep4Prop
   const [verifyOtp, { loading: verifying }] = useMutation(VERIFY_OTP);
   const [updateUser, { loading: updatingUser }] = useMutation(UPDATE_USER);
   const [updatePassword, { loading: updatingPassword }] = useMutation(UPDATE_PASSWORD);
+
+  const { data: centerData } = useQuery(CENTERS);
+  const center = centerData?.centers?.[0];
 
   // Send OTP on component mount
   useEffect(() => {
@@ -195,9 +199,18 @@ export default function SignupStep4Screen({ navigation, route }: SignupStep4Prop
             <Text style={styles.backButtonText}>← Back</Text>
           </TouchableOpacity>
 
-          <View style={styles.iconContainer}>
-            <Text style={styles.iconText}>📱</Text>
-          </View>
+          {center?.logoUrl ? (
+            <Image 
+              source={{ uri: center.logoUrl }} 
+              style={styles.centerLogo}
+              resizeMode="contain"
+            />
+          ) : (
+            <View style={styles.iconContainer}>
+              <Text style={styles.iconText}>📱</Text>
+            </View>
+          )}
+          <Text style={styles.centerName}>{center?.name || 'Vehicle Wash'}</Text>
           <Text style={styles.title}>Verify Mobile</Text>
           <Text style={styles.subtitle}>Enter the OTP sent to your phone</Text>
         </LinearGradient>
@@ -319,6 +332,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
+  },
+  centerLogo: {
+    width: 80,
+    height: 80,
+    marginBottom: 12,
+  },
+  centerName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 4,
   },
   iconText: {
     fontSize: 40,

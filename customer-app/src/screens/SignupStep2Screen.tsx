@@ -9,8 +9,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Image,
 } from 'react-native';
+import { useQuery } from '@apollo/client';
 import { LinearGradient } from 'expo-linear-gradient';
+import { CENTERS } from '../apollo/queries';
 
 interface SignupStep2Props {
   navigation: any;
@@ -28,6 +31,9 @@ export default function SignupStep2Screen({ navigation, route }: SignupStep2Prop
   const [city, setCity] = useState('');
   const [pinCode, setPinCode] = useState('');
   const [errors, setErrors] = useState<any>({});
+
+  const { data: centerData } = useQuery(CENTERS);
+  const center = centerData?.centers?.[0];
 
   // Validation
   const validate = () => {
@@ -98,9 +104,18 @@ export default function SignupStep2Screen({ navigation, route }: SignupStep2Prop
             <Text style={styles.backButtonText}>← Back</Text>
           </TouchableOpacity>
 
-          <View style={styles.iconContainer}>
-            <Text style={styles.iconText}>📍</Text>
-          </View>
+          {center?.logoUrl ? (
+            <Image 
+              source={{ uri: center.logoUrl }} 
+              style={styles.centerLogo}
+              resizeMode="contain"
+            />
+          ) : (
+            <View style={styles.iconContainer}>
+              <Text style={styles.iconText}>📍</Text>
+            </View>
+          )}
+          <Text style={styles.centerName}>{center?.name || 'Vehicle Wash'}</Text>
           <Text style={styles.title}>Address Details</Text>
           <Text style={styles.subtitle}>Where can we reach you?</Text>
         </LinearGradient>
@@ -236,6 +251,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
+  },
+  centerLogo: {
+    width: 80,
+    height: 80,
+    marginBottom: 12,
+  },
+  centerName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 4,
   },
   iconText: {
     fontSize: 40,

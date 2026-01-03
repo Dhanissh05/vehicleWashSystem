@@ -203,6 +203,14 @@ export default function MenuModal({ visible, onClose, navigation }: MenuModalPro
               <Text style={styles.menuText}>Slot Bookings</Text>
             </TouchableOpacity>
 
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => handleNavigate('Estimations')}
+            >
+              <Text style={styles.menuIcon}>📄</Text>
+              <Text style={styles.menuText}>Estimations</Text>
+            </TouchableOpacity>
+
             {userRole === 'WORKER' && (
               <>
                 <TouchableOpacity

@@ -189,3 +189,173 @@ export const CUSTOMERS = gql`
     }
   }
 `;
+
+// Estimation Queries
+export const ESTIMATIONS = gql`
+  query Estimations($status: EstimationStatus, $limit: Int, $offset: Int) {
+    estimations(status: $status, limit: $limit, offset: $offset) {
+      id
+      estimationNumber
+      customerName
+      customerMobile
+      vehicleNumber
+      vehicleType
+      preparedByName
+      preparedByRole
+      status
+      totalAmount
+      validUntil
+      createdAt
+      updatedAt
+      items {
+        id
+        serviceName
+        description
+        quantity
+        unitPrice
+        totalPrice
+      }
+      center {
+        name
+        address
+        mobile
+        email
+        logoUrl
+      }
+    }
+  }
+`;
+
+export const ESTIMATION = gql`
+  query Estimation($id: ID!) {
+    estimation(id: $id) {
+      id
+      estimationNumber
+      customerName
+      customerMobile
+      vehicleNumber
+      vehicleType
+      preparedByName
+      preparedByRole
+      termsAndConditions
+      notes
+      status
+      totalAmount
+      validUntil
+      createdAt
+      updatedAt
+      items {
+        id
+        serviceName
+        description
+        quantity
+        unitPrice
+        totalPrice
+      }
+      center {
+        name
+        address
+        mobile
+        email
+        logoUrl
+      }
+    }
+  }
+`;
+
+export const CREATE_ESTIMATION = gql`
+  mutation CreateEstimation($input: CreateEstimationInput!) {
+    createEstimation(input: $input) {
+      id
+      estimationNumber
+      customerName
+      customerMobile
+      vehicleNumber
+      vehicleType
+      status
+      totalAmount
+      createdAt
+    }
+  }
+`;
+
+export const UPDATE_ESTIMATION = gql`
+  mutation UpdateEstimation($id: ID!, $input: UpdateEstimationInput!) {
+    updateEstimation(id: $id, input: $input) {
+      id
+      estimationNumber
+      customerName
+      customerMobile
+      vehicleNumber
+      vehicleType
+      termsAndConditions
+      notes
+      status
+      totalAmount
+      validUntil
+      updatedAt
+    }
+  }
+`;
+
+export const DELETE_ESTIMATION = gql`
+  mutation DeleteEstimation($id: ID!) {
+    deleteEstimation(id: $id)
+  }
+`;
+
+export const ADD_ESTIMATION_ITEM = gql`
+  mutation AddEstimationItem($input: AddEstimationItemInput!) {
+    addEstimationItem(input: $input) {
+      id
+      serviceName
+      description
+      quantity
+      unitPrice
+      totalPrice
+    }
+  }
+`;
+
+export const UPDATE_ESTIMATION_ITEM = gql`
+  mutation UpdateEstimationItem($id: ID!, $input: UpdateEstimationItemInput!) {
+    updateEstimationItem(id: $id, input: $input) {
+      id
+      serviceName
+      description
+      quantity
+      unitPrice
+      totalPrice
+    }
+  }
+`;
+
+export const DELETE_ESTIMATION_ITEM = gql`
+  mutation DeleteEstimationItem($id: ID!) {
+    deleteEstimationItem(id: $id)
+  }
+`;
+
+export const GET_SYSTEM_CONFIG = gql`
+  query GetSystemConfig($key: String!) {
+    systemConfig(key: $key) {
+      id
+      key
+      value
+      description
+      updatedAt
+    }
+  }
+`;
+
+export const UPDATE_SYSTEM_CONFIG = gql`
+  mutation UpdateSystemConfig($key: String!, $value: String!) {
+    updateSystemConfig(key: $key, value: $value) {
+      id
+      key
+      value
+      description
+      updatedAt
+    }
+  }
+`;

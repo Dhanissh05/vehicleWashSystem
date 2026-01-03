@@ -6,7 +6,7 @@ import { ApolloProvider, ApolloClient, InMemoryCache, createHttpLink } from '@ap
 import { setContext } from '@apollo/client/link/context';
 import { onError } from '@apollo/client/link/error';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ActivityIndicator, View, StyleSheet } from 'react-native';
+import { ActivityIndicator, View, StyleSheet, Alert } from 'react-native';
 import { useVersionChecker } from './src/hooks/useVersionChecker';
 import UpdateChecker from './src/components/UpdateChecker';
 import BookingNotificationListener from './src/components/BookingNotificationListener';
@@ -28,6 +28,8 @@ import SlotBookingsScreen from './src/screens/SlotBookingsScreen';
 import SlotBookingDetailScreen from './src/screens/SlotBookingDetailScreen';
 import PushNotificationScreen from './src/screens/PushNotificationScreen';
 import ManageUsersScreen from './src/screens/ManageUsersScreen';
+import EstimationsScreen from './src/screens/EstimationsScreen';
+import EstimationFormScreen from './src/screens/EstimationFormScreen';
 
 const Stack = createStackNavigator();
 
@@ -42,11 +44,28 @@ const httpLink = createHttpLink({
   uri: API_URL,
 });
 
-const errorLink = onError(({ graphQLErrors, networkError }) => {
+const errorLink = onError(({ graphQLErrors, networkError, operation }) => {
   if (graphQLErrors) {
-    graphQLErrors.forEach(({ message, locations, path }) => {
+    graphQLErrors.forEach(async ({ message, locations, path }) => {
       // Ignore null me errors - these happen when user isn't authenticated
       if (path && path.includes('me') && message.includes('null')) {
+        return;
+      }
+      // Handle "Not authenticated" errors
+      if (message.includes('Not authenticated')) {
+        if (!operation.getContext().authErrorLogged) {
+          console.log(`[Auth Required]: ${operation.operationName || 'query'}`);
+          operation.setContext({ authErrorLogged: true });
+          
+          // After multiple auth failures, clear the invalid session
+          const failureCount = (operation.getContext().authFailureCount || 0) + 1;
+          operation.setContext({ authFailureCount: failureCount });
+          
+          if (failureCount >= 5) {
+            console.log('[Auth] Too many failures - clearing invalid session');
+            await AsyncStorage.multiRemove(['token', 'isLoggedIn', 'user']);
+          }
+        }
         return;
       }
       // Only log once, not on every retry
@@ -73,19 +92,46 @@ const authLink = setContext(async (_, { headers }) => {
 
 const apolloClient = new ApolloClient({
   link: errorLink.concat(authLink.concat(httpLink)),
-  cache: new InMemoryCache(),
+  cache: new InMemoryCache({
+    typePolicies: {
+      Query: {
+        fields: {
+          vehicles: {
+            merge: false, // Always replace with incoming data
+          },
+        },
+      },
+      SlotService: {
+        fields: {
+          pricing: {
+            merge: false, // Always replace pricing object
+          },
+        },
+      },
+    },
+  }),
   defaultOptions: {
     watchQuery: {
       fetchPolicy: 'network-only',
+      errorPolicy: 'all',
+      notifyOnNetworkStatusChange: true,
     },
     query: {
       fetchPolicy: 'network-only',
+      errorPolicy: 'all',
+    },
+    mutate: {
+      errorPolicy: 'all',
     },
   },
 });
 
 function AppNavigator() {
   const [initialRoute, setInitialRoute] = React.useState<string | null>(null);
+  const [passcodeModalVisible, setPasscodeModalVisible] = React.useState(false);
+  const [passcodeInput, setPasscodeInput] = React.useState('');
+  const [attempts, setAttempts] = React.useState(0);
+  const maxAttempts = 3;
 
   useVersionChecker();
 
@@ -97,9 +143,20 @@ function AppNavigator() {
     try {
       const isLoggedIn = await AsyncStorage.getItem('isLoggedIn');
       const isPasscodeSetup = await AsyncStorage.getItem('isPasscodeSetup');
+      const token = await AsyncStorage.getItem('token');
       
       console.log('[Auth Check] isLoggedIn:', isLoggedIn);
       console.log('[Auth Check] isPasscodeSetup:', isPasscodeSetup);
+      console.log('[Auth Check] hasToken:', !!token);
+      
+      // If no token but marked as logged in, clear the login state
+      if (isLoggedIn === 'true' && !token) {
+        console.log('[Auth Check] Invalid state detected - clearing login');
+        await AsyncStorage.removeItem('isLoggedIn');
+        await AsyncStorage.removeItem('isPasscodeSetup');
+        setInitialRoute('Login');
+        return;
+      }
       
       if (isLoggedIn === 'true' && isPasscodeSetup === 'true') {
         setInitialRoute('PasscodeUnlock');
@@ -175,6 +232,8 @@ function AppNavigator() {
         <Stack.Screen name="SlotBookingDetail" component={SlotBookingDetailScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ManageUsers" component={ManageUsersScreen} options={{ title: 'Manage Users' }} />
         <Stack.Screen name="PushNotification" component={PushNotificationScreen} options={{ title: 'Push Notification' }} />
+        <Stack.Screen name="Estimations" component={EstimationsScreen} options={{ title: 'Estimations' }} />
+        <Stack.Screen name="EstimationForm" component={EstimationFormScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="WorkerProfile" component={WorkerProfileScreen} options={{ title: 'My Profile' }} />
       </Stack.Navigator>

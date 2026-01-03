@@ -22,6 +22,7 @@
     "android": {
       "package": "com.vehiclewash.company",
       "versionCode": 1,
+      "usesCleartextTraffic": true,
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE",

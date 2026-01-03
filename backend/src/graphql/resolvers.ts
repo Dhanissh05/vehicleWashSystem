@@ -46,6 +46,13 @@ const PaymentStatus = {
   REFUNDED: 'REFUNDED',
 };
 
+const PaymentMethod = {
+  CASH: 'CASH',
+  ONLINE: 'ONLINE',
+  UPI: 'UPI',
+  CARD: 'CARD',
+};
+
 const SlotBookingStatus = {
   PENDING: 'PENDING',
   VERIFIED: 'VERIFIED',
@@ -131,9 +138,14 @@ export const resolvers = {
           worker: true,
           payment: true,
           center: true,
+          pricing: true,
           slotBooking: {
             include: {
-              services: true,
+              services: {
+                include: {
+                  pricing: true,
+                },
+              },
             },
           },
         },
@@ -154,6 +166,7 @@ export const resolvers = {
           worker: true,
           payment: true,
           center: true,
+          pricing: true,
         },
       });
     },
@@ -171,6 +184,7 @@ export const resolvers = {
           worker: true,
           payment: true,
           center: true,
+          pricing: true,
         },
         orderBy: { createdAt: 'desc' },
       });
@@ -186,9 +200,14 @@ export const resolvers = {
           worker: true,
           payment: true,
           center: true,
+          pricing: true,
           slotBooking: {
             include: {
-              services: true,
+              services: {
+                include: {
+                  pricing: true,
+                },
+              },
             },
           },
         },
@@ -205,6 +224,7 @@ export const resolvers = {
         include: {
           customer: true,
           payment: true,
+          pricing: true,
           center: true,
         },
         orderBy: { createdAt: 'desc' },
@@ -488,6 +508,58 @@ export const resolvers = {
         updateMessage: updateMessageConfig?.value || 'A new version is available. Please update to continue.',
         releaseNotes: releaseNotesConfig?.value || null,
       };
+    },
+
+    // Estimations
+    estimations: async (
+      _: any,
+      { status, limit = 50, offset = 0 }: any,
+      context: Context
+    ) => {
+      requireStaff(context);
+      const user = requireAuth(context);
+
+      return await context.prisma.estimation.findMany({
+        where: {
+          centerId: user.centerId!,
+          ...(status && { status }),
+        },
+        include: {
+          items: true,
+          center: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip: offset,
+      });
+    },
+
+    estimation: async (_: any, { id }: any, context: Context) => {
+      requireStaff(context);
+      
+      return await context.prisma.estimation.findUnique({
+        where: { id },
+        include: {
+          items: true,
+          center: true,
+        },
+      });
+    },
+
+    estimationByNumber: async (_: any, { estimationNumber }: any, context: Context) => {
+      requireStaff(context);
+      const user = requireAuth(context);
+
+      return await context.prisma.estimation.findFirst({
+        where: {
+          estimationNumber,
+          centerId: user.centerId!,
+        },
+        include: {
+          items: true,
+          center: true,
+        },
+      });
     },
   },
 
@@ -1231,6 +1303,198 @@ export const resolvers = {
         include: {
           customer: true,
           worker: true,
+          pricing: true,
+        },
+      });
+    },
+
+    // Update vehicle pricing category
+    updateVehiclePricing: async (_: any, { input }: any, context: Context) => {
+      requireStaff(context);
+      
+      // Verify the pricing exists
+      const pricing = await context.prisma.pricing.findUnique({
+        where: { id: input.pricingId },
+      });
+
+      if (!pricing) {
+        throw new Error('Pricing category not found');
+      }
+
+      // Update the vehicle's pricing
+      const vehicle = await context.prisma.vehicle.update({
+        where: { id: input.vehicleId },
+        data: { pricingId: input.pricingId },
+        include: {
+          customer: true,
+          worker: true,
+          payment: true,
+          center: true,
+          pricing: true,
+        },
+      });
+
+      // If payment exists and is not yet paid, update the amount
+      if (vehicle.payment && vehicle.payment.status !== 'PAID') {
+        await context.prisma.payment.update({
+          where: { id: vehicle.payment.id },
+          data: { amount: pricing.price },
+        });
+      }
+
+      return vehicle;
+    },
+
+    // Update pricing for a specific service
+    updateServicePricing: async (_: any, { input }: any, context: Context) => {
+      requireStaff(context);
+      
+      console.log('updateServicePricing input:', JSON.stringify(input, null, 2));
+      
+      // Check if there's an active payment in progress
+      const service = await context.prisma.slotService.findUnique({
+        where: { id: input.serviceId },
+        include: {
+          slotBooking: {
+            include: {
+              vehicles: {
+                include: {
+                  payment: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!service) {
+        throw new Error('Service not found');
+      }
+
+      // Get the vehicle for this service
+      const vehicle = service.slotBooking?.vehicles?.[0];
+      
+      // Prevent pricing changes after delivery
+      if (vehicle?.status === 'DELIVERED') {
+        throw new Error('Cannot change pricing after vehicle has been delivered.');
+      }
+      
+      // Prevent pricing changes if payment is pending
+      if (vehicle?.payment && vehicle.payment.status === 'PENDING') {
+        throw new Error('Cannot change pricing while payment is in progress. Please wait for the customer to complete or cancel the payment.');
+      }
+      
+      const updateData: any = {};
+
+      // Check if resetting pricing - if pricingId is null/undefined and customPrice is null/undefined
+      const isResetting = !input.pricingId && !input.customPrice;
+      
+      console.log('isResetting:', isResetting, 'pricingId:', input.pricingId, 'customPrice:', input.customPrice);
+      
+      if (isResetting) {
+        // Reset all pricing
+        updateData.pricingId = null;
+        updateData.customPrice = null;
+        updateData.customPricingName = null;
+      } else if (input.pricingId) {
+        // Verify the pricing category exists
+        const pricing = await context.prisma.pricing.findUnique({
+          where: { id: input.pricingId },
+        });
+
+        if (!pricing) {
+          throw new Error('Pricing category not found');
+        }
+
+        updateData.pricingId = input.pricingId;
+        updateData.customPrice = null;
+        updateData.customPricingName = null;
+      } else if (input.customPrice !== null && input.customPrice !== undefined) {
+        // Use custom pricing
+        updateData.pricingId = null;
+        updateData.customPrice = input.customPrice;
+        updateData.customPricingName = input.customPricingName || 'Custom';
+      } else {
+        throw new Error('Either pricingId or customPrice must be provided');
+      }
+
+      // Update the service's pricing
+      const updatedService = await context.prisma.slotService.update({
+        where: { id: input.serviceId },
+        data: updateData,
+        include: {
+          pricing: true,
+          slotBooking: {
+            include: {
+              services: {
+                include: {
+                  pricing: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      // Recalculate total amount for the vehicle and update payment if exists
+      const vehicleWithPayment = await context.prisma.vehicle.findFirst({
+        where: { slotBookingId: updatedService.slotBookingId },
+        include: {
+          payment: true,
+          slotBooking: {
+            include: {
+              services: {
+                include: {
+                  pricing: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (vehicleWithPayment && vehicleWithPayment.slotBooking) {
+        // Calculate total from all services (pricing or custom price)
+        const totalAmount = vehicleWithPayment.slotBooking.services.reduce((sum: number, svc: any) => {
+          return sum + (svc.pricing?.price || svc.customPrice || 0);
+        }, 0);
+
+        // Update payment amount if payment exists and not yet paid
+        if (vehicleWithPayment.payment && vehicleWithPayment.payment.status !== 'PAID' && totalAmount > 0) {
+          await context.prisma.payment.update({
+            where: { id: vehicleWithPayment.payment.id },
+            data: { amount: totalAmount },
+          });
+        }
+      }
+
+      console.log('Returning service with pricing:', updatedService.pricing, 'customPrice:', updatedService.customPrice);
+      return updatedService;
+    },
+
+    // Create pricing
+    createPricing: async (_: any, { input }: any, context: Context) => {
+      requireAdmin(context);
+      
+      // Check if pricing with same vehicleType and categoryName already exists
+      const existing = await context.prisma.pricing.findFirst({
+        where: {
+          vehicleType: input.vehicleType,
+          categoryName: input.categoryName,
+          isActive: true,
+        },
+      });
+
+      if (existing) {
+        throw new Error(`Pricing for ${input.categoryName} already exists`);
+      }
+
+      return await context.prisma.pricing.create({
+        data: {
+          vehicleType: input.vehicleType,
+          categoryName: input.categoryName,
+          price: input.price,
+          description: input.description,
         },
       });
     },
@@ -1239,23 +1503,21 @@ export const resolvers = {
     updatePricing: async (_: any, { input }: any, context: Context) => {
       requireAdmin(context);
       
-      return await context.prisma.pricing.upsert({
-        where: {
-          vehicleType_carCategory: {
-            vehicleType: input.vehicleType,
-            carCategory: input.carCategory || null,
-          },
-        },
-        update: {
-          price: input.price,
-          description: input.description,
-        },
-        create: {
-          vehicleType: input.vehicleType,
-          carCategory: input.carCategory,
-          price: input.price,
-          description: input.description,
-        },
+      const updateData: any = {};
+      
+      if (input.categoryName !== undefined) {
+        updateData.categoryName = input.categoryName;
+      }
+      if (input.price !== undefined) {
+        updateData.price = input.price;
+      }
+      if (input.description !== undefined) {
+        updateData.description = input.description;
+      }
+
+      return await context.prisma.pricing.update({
+        where: { id: input.id },
+        data: updateData,
       });
     },
 
@@ -1263,9 +1525,8 @@ export const resolvers = {
     deletePricing: async (_: any, { id }: any, context: Context) => {
       requireAdmin(context);
       
-      await context.prisma.pricing.update({
+      await context.prisma.pricing.delete({
         where: { id },
-        data: { isActive: false },
       });
       
       return true;
@@ -1359,6 +1620,111 @@ export const resolvers = {
       return 'order_mock_id_' + Math.random().toString(36).substr(2, 9);
     },
 
+    // Delete payment (reset payment for a vehicle)
+    deletePayment: async (_: any, { vehicleId }: any, context: Context) => {
+      requireStaff(context);
+      
+      const payment = await context.prisma.payment.findUnique({
+        where: { vehicleId },
+      });
+
+      if (!payment) {
+        throw new Error('Payment not found for this vehicle');
+      }
+
+      // Don't allow deletion of already paid payments
+      if (payment.status === PaymentStatus.PAID) {
+        throw new Error('Cannot delete a paid payment');
+      }
+
+      await context.prisma.payment.delete({
+        where: { vehicleId },
+      });
+
+      console.log(`✅ Payment deleted for vehicle ${vehicleId}`);
+      return true;
+    },
+
+    // Adjust payment amount before delivery (resets payment for customer to pay again)
+    adjustPayment: async (_: any, { vehicleId }: any, context: Context) => {
+      requireStaff(context);
+      
+      const vehicle = await context.prisma.vehicle.findUnique({
+        where: { id: vehicleId },
+        include: {
+          payment: true,
+          pricing: true,
+          slotBooking: {
+            include: {
+              services: {
+                include: {
+                  pricing: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!vehicle) {
+        throw new Error('Vehicle not found');
+      }
+
+      // Prevent adjustment after delivery
+      if (vehicle.status === 'DELIVERED') {
+        throw new Error('Cannot adjust payment after vehicle has been delivered');
+      }
+
+      if (!vehicle.payment) {
+        throw new Error('No payment found for this vehicle');
+      }
+
+      // Don't allow adjustment of already paid payments
+      if (vehicle.payment.status === PaymentStatus.PAID) {
+        throw new Error('Cannot adjust a completed payment. Payment has already been received.');
+      }
+
+      // Calculate new total from current service pricing
+      let newAmount = 0;
+      let hasValidPricing = false;
+      if (vehicle.slotBooking && vehicle.slotBooking.services) {
+        newAmount = vehicle.slotBooking.services.reduce((sum: number, service: any) => {
+          const serviceAmount = service.pricing?.price || service.customPrice || 0;
+          if (serviceAmount > 0) hasValidPricing = true;
+          return sum + serviceAmount;
+        }, 0);
+      }
+
+      // Fallback to vehicle pricing if no service pricing
+      if (!hasValidPricing && newAmount === 0 && vehicle.pricing) {
+        newAmount = vehicle.pricing.price;
+        hasValidPricing = true;
+      }
+
+      if (!hasValidPricing || newAmount === 0) {
+        throw new Error('No valid pricing configured. Please set service pricing before adjusting payment.');
+      }
+
+      // Reset payment status to trigger new payment from customer
+      const updatedPayment = await context.prisma.payment.update({
+        where: { id: vehicle.payment.id },
+        data: {
+          amount: newAmount,
+          status: PaymentStatus.MANUAL_PENDING,
+          method: PaymentMethod.CASH, // Reset to default
+          paymentMode: 'MANUAL',
+          transactionId: null,
+        },
+        include: {
+          vehicle: true,
+          customer: true,
+        },
+      });
+
+      console.log(`✅ Payment adjusted for vehicle ${vehicleId}: Old amount unknown, New amount: ${newAmount}`);
+      return updatedPayment;
+    },
+
     // Create payment when customer selects payment method
     createPayment: async (_: any, { input }: any, context: Context) => {
       try {
@@ -1366,7 +1732,19 @@ export const resolvers = {
         
         const vehicle = await context.prisma.vehicle.findUnique({
           where: { id: input.vehicleId },
-          include: { customer: true },
+          include: { 
+            customer: true,
+            pricing: true,
+            slotBooking: {
+              include: {
+                services: {
+                  include: {
+                    pricing: true,
+                  },
+                },
+              },
+            },
+          },
         });
 
         if (!vehicle) {
@@ -1386,17 +1764,46 @@ export const resolvers = {
           throw new Error('Payment already exists for this vehicle');
         }
 
-        // Get pricing
-        const pricing = await context.prisma.pricing.findFirst({
-          where: {
-            vehicleType: vehicle.vehicleType,
-            carCategory: vehicle.carCategory,
-            isActive: true,
-          },
-        });
+        // Calculate total amount from service pricing
+        let totalAmount = 0;
+        let hasValidPricing = false;
+        if (vehicle.slotBooking && vehicle.slotBooking.services) {
+          totalAmount = vehicle.slotBooking.services.reduce((sum: number, service: any) => {
+            const serviceAmount = service.pricing?.price || service.customPrice || 0;
+            if (serviceAmount > 0) hasValidPricing = true;
+            return sum + serviceAmount;
+          }, 0);
+        }
 
-        if (!pricing) {
-          throw new Error('Pricing not configured for this vehicle type');
+        // Validate pricing is configured before payment
+        if (!hasValidPricing && totalAmount === 0) {
+          throw new Error('Service pricing is not configured yet. Please wait for the service center to set the pricing before making payment.');
+        }
+
+        // Fallback to vehicle pricing if no service pricing configured
+        if (totalAmount === 0) {
+          let pricing = vehicle.pricing;
+          
+          if (!pricing) {
+            pricing = await context.prisma.pricing.findFirst({
+              where: {
+                vehicleType: vehicle.vehicleType,
+                carCategory: vehicle.carCategory,
+                isActive: true,
+              },
+            });
+          }
+
+          if (!pricing) {
+            throw new Error('Pricing not configured for this vehicle. Please select a pricing category first.');
+          }
+
+          totalAmount = pricing.price;
+        }
+
+        // Validate expected amount to prevent race conditions
+        if (input.expectedAmount !== undefined && input.expectedAmount !== totalAmount) {
+          throw new Error(`Payment amount has changed. Expected ₹${input.expectedAmount} but current amount is ₹${totalAmount}. Please refresh and try again.`);
         }
 
         // Determine payment mode
@@ -1405,7 +1812,7 @@ export const resolvers = {
 
         const payment = await context.prisma.payment.create({
           data: {
-            amount: pricing.price,
+            amount: totalAmount,
             method: input.method,
             paymentMode,
             status,
@@ -1418,7 +1825,7 @@ export const resolvers = {
           },
         });
 
-        console.log(`✅ Payment created: ${payment.id} for vehicle ${vehicle.id}, method: ${input.method}`);
+        console.log(`✅ Payment created: ${payment.id} for vehicle ${vehicle.id}, method: ${input.method}, amount: ${totalAmount}`);
         return payment;
       } catch (error: any) {
         console.error('❌ Error in createPayment:', error.message);
@@ -2288,63 +2695,132 @@ export const resolvers = {
         data: updateData,
       });
 
-      // Auto-update vehicle status to READY_FOR_PICKUP when all non-cancelled services are completed
-      if (status === 'COMPLETED' && service.slotBooking) {
-        const allServices = service.slotBooking.services;
-        const allNonCancelledCompleted = allServices.every(
-          (s: any) => s.id === serviceId ? true : (s.status === 'COMPLETED' || s.status === 'CANCELLED')
+      // Note: Vehicle status is NOT automatically updated to READY_FOR_PICKUP
+      // Admin/worker must confirm the bill using confirmBill mutation after setting all pricing
+
+      return updatedService;
+    },
+
+    // Confirm bill and mark vehicle as READY_FOR_PICKUP
+    confirmBill: async (_: any, { vehicleId }: any, context: Context) => {
+      requireStaff(context);
+
+      const vehicle = await context.prisma.vehicle.findUnique({
+        where: { id: vehicleId },
+        include: {
+          customer: true,
+          center: true,
+          payment: true,
+          pricing: true,
+          slotBooking: {
+            include: {
+              services: {
+                include: {
+                  pricing: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!vehicle) {
+        throw new Error('Vehicle not found');
+      }
+
+      // Prevent confirming bill after delivery
+      if (vehicle.status === 'DELIVERED') {
+        throw new Error('Cannot confirm bill for delivered vehicle');
+      }
+
+      // Check if all services are completed or cancelled
+      if (vehicle.slotBooking && vehicle.slotBooking.services) {
+        const allServicesCompleted = vehicle.slotBooking.services.every(
+          (s: any) => s.status === 'COMPLETED' || s.status === 'CANCELLED'
         );
 
-        if (allNonCancelledCompleted) {
-          // Find the vehicle associated with this slot booking
-          const vehicle = await context.prisma.vehicle.findFirst({
-            where: {
-              slotBookingId: service.slotBookingId,
-            },
-            include: {
-              customer: true,
-              center: true,
-              payment: true,
-            },
-          });
+        if (!allServicesCompleted) {
+          throw new Error('Cannot confirm bill. All services must be completed or cancelled first.');
+        }
 
-          if (vehicle && vehicle.status !== 'READY_FOR_PICKUP' && vehicle.status !== 'DELIVERED') {
-            const amount = vehicle.payment?.amount || 0;
-            
-            await context.prisma.vehicle.update({
-              where: { id: vehicle.id },
-              data: {
-                status: 'READY_FOR_PICKUP',
-                readyAt: new Date(),
-              },
-            });
-            
-            console.log(`✅ Auto-updated vehicle ${vehicle.vehicleNumber} to READY_FOR_PICKUP`);
-            
-            // Send SMS notification to customer
-            if (vehicle.customer.name && vehicle.center.name) {
-              await sendVehicleReadySms(
-                vehicle.customer.mobile,
-                vehicle.customer.name,
-                vehicle.vehicleNumber,
-                vehicle.center.name,
-                amount
-              );
-            }
+        // Check if all completed services have pricing
+        const completedServices = vehicle.slotBooking.services.filter(
+          (s: any) => s.status === 'COMPLETED'
+        );
 
-            // Send push notification if FCM token available
-            if (vehicle.customer.fcmToken) {
-              await sendVehicleReadyNotification(
-                vehicle.customer.fcmToken,
-                vehicle.vehicleNumber,
-                amount
-              );
-            }
-          }
+        const missingPricing = completedServices.filter(
+          (s: any) => !s.pricing && !s.customPrice
+        );
+
+        if (missingPricing.length > 0) {
+          throw new Error(`Cannot confirm bill. ${missingPricing.length} service(s) are missing pricing. Please set pricing for all completed services.`);
         }
       }
 
-      return updatedService;
+      // Calculate total amount
+      let amount = 0;
+      if (vehicle.slotBooking && vehicle.slotBooking.services) {
+        amount = vehicle.slotBooking.services.reduce((sum: number, svc: any) => {
+          return sum + (svc.pricing?.price || svc.customPrice || 0);
+        }, 0);
+      }
+
+      // Fallback to vehicle pricing
+      if (amount === 0 && vehicle.pricing) {
+        amount = vehicle.pricing.price;
+      }
+
+      if (amount === 0) {
+        throw new Error('Cannot confirm bill with zero amount. Please set pricing first.');
+      }
+
+      // Update vehicle status to READY_FOR_PICKUP
+      const updatedVehicle = await context.prisma.vehicle.update({
+        where: { id: vehicleId },
+        data: {
+          status: 'READY_FOR_PICKUP',
+          readyAt: new Date(),
+        },
+        include: {
+          customer: true,
+          center: true,
+          payment: true,
+          pricing: true,
+          slotBooking: {
+            include: {
+              services: {
+                include: {
+                  pricing: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      console.log(`✅ Bill confirmed for vehicle ${vehicle.vehicleNumber}, amount: ₹${amount}`);
+
+      // Send SMS notification to customer
+      if (vehicle.customer.name && vehicle.center.name) {
+        await sendVehicleReadySms(
+          vehicle.customer.mobile,
+          vehicle.customer.name,
+          vehicle.vehicleNumber,
+          vehicle.center.name,
+          amount
+        );
+      }
+
+      // Send push notification if FCM token available
+      if (vehicle.customer.fcmToken) {
+        await sendVehicleReadyNotification(
+          vehicle.customer.fcmToken,
+          vehicle.vehicleNumber,
+          amount
+        );
+      }
+
+      return updatedVehicle;
     },
 
     cancelService: async (_: any, { serviceId }: any, context: Context) => {
@@ -2592,6 +3068,195 @@ export const resolvers = {
         console.error('❌ Error sending broadcast notification:', error);
         throw new Error('Failed to send broadcast notification');
       }
+    },
+
+    // Estimation Management
+    createEstimation: async (_: any, { input }: any, context: Context) => {
+      requireStaff(context);
+      const user = requireAuth(context);
+
+      // Get full user data to ensure we have the name
+      const fullUser = await context.prisma.user.findUnique({
+        where: { id: user.id }
+      });
+
+      // Generate unique estimation number
+      const count = await context.prisma.estimation.count();
+      const estimationNumber = `EST-${String(count + 1).padStart(6, '0')}`;
+
+      // Get centerId from input, user, or first available center
+      let centerId = input.centerId || user.centerId;
+      if (!centerId) {
+        const defaultCenter = await context.prisma.center.findFirst();
+        centerId = defaultCenter?.id;
+      }
+
+      const estimation = await context.prisma.estimation.create({
+        data: {
+          estimationNumber,
+          customerName: input.customerName,
+          customerMobile: input.customerMobile,
+          vehicleNumber: input.vehicleNumber,
+          vehicleType: input.vehicleType,
+          centerId,
+          preparedBy: user.id,
+          preparedByName: fullUser?.name || user.name || fullUser?.mobile || 'Admin',
+          preparedByRole: user.role,
+          termsAndConditions: input.termsAndConditions,
+          notes: input.notes,
+          validUntil: input.validUntil,
+          status: 'DRAFT',
+          totalAmount: 0,
+        },
+        include: {
+          items: true,
+          center: true,
+        },
+      });
+
+      return estimation;
+    },
+
+    updateEstimation: async (_: any, { id, input }: any, context: Context) => {
+      requireStaff(context);
+
+      const estimation = await context.prisma.estimation.update({
+        where: { id },
+        data: {
+          ...(input.customerName && { customerName: input.customerName }),
+          ...(input.customerMobile && { customerMobile: input.customerMobile }),
+          ...(input.vehicleNumber !== undefined && { vehicleNumber: input.vehicleNumber }),
+          ...(input.vehicleType !== undefined && { vehicleType: input.vehicleType }),
+          ...(input.termsAndConditions !== undefined && { termsAndConditions: input.termsAndConditions }),
+          ...(input.notes !== undefined && { notes: input.notes }),
+          ...(input.status && { status: input.status }),
+          ...(input.validUntil !== undefined && { validUntil: input.validUntil }),
+        },
+        include: {
+          items: true,
+          center: true,
+        },
+      });
+
+      return estimation;
+    },
+
+    deleteEstimation: async (_: any, { id }: any, context: Context) => {
+      requireStaff(context);
+
+      await context.prisma.estimation.delete({
+        where: { id },
+      });
+
+      return true;
+    },
+
+    addEstimationItem: async (_: any, { input }: any, context: Context) => {
+      requireStaff(context);
+
+      const totalPrice = input.quantity * input.unitPrice;
+
+      const item = await context.prisma.estimationItem.create({
+        data: {
+          estimationId: input.estimationId,
+          serviceName: input.serviceName,
+          description: input.description,
+          quantity: input.quantity,
+          unitPrice: input.unitPrice,
+          totalPrice,
+        },
+      });
+
+      // Update estimation total amount
+      const estimation = await context.prisma.estimation.findUnique({
+        where: { id: input.estimationId },
+        include: { items: true },
+      });
+
+      if (estimation) {
+        const newTotal = estimation.items.reduce((sum, item) => sum + item.totalPrice, 0);
+        await context.prisma.estimation.update({
+          where: { id: input.estimationId },
+          data: { totalAmount: newTotal },
+        });
+      }
+
+      return item;
+    },
+
+    updateEstimationItem: async (_: any, { id, input }: any, context: Context) => {
+      requireStaff(context);
+
+      const existingItem = await context.prisma.estimationItem.findUnique({
+        where: { id },
+      });
+
+      if (!existingItem) {
+        throw new Error('Estimation item not found');
+      }
+
+      const quantity = input.quantity !== undefined ? input.quantity : existingItem.quantity;
+      const unitPrice = input.unitPrice !== undefined ? input.unitPrice : existingItem.unitPrice;
+      const totalPrice = quantity * unitPrice;
+
+      const item = await context.prisma.estimationItem.update({
+        where: { id },
+        data: {
+          ...(input.serviceName && { serviceName: input.serviceName }),
+          ...(input.description !== undefined && { description: input.description }),
+          ...(input.quantity !== undefined && { quantity: input.quantity }),
+          ...(input.unitPrice !== undefined && { unitPrice: input.unitPrice }),
+          totalPrice,
+        },
+      });
+
+      // Update estimation total amount
+      const estimation = await context.prisma.estimation.findUnique({
+        where: { id: item.estimationId },
+        include: { items: true },
+      });
+
+      if (estimation) {
+        const newTotal = estimation.items.reduce((sum, item) => sum + item.totalPrice, 0);
+        await context.prisma.estimation.update({
+          where: { id: item.estimationId },
+          data: { totalAmount: newTotal },
+        });
+      }
+
+      return item;
+    },
+
+    deleteEstimationItem: async (_: any, { id }: any, context: Context) => {
+      requireStaff(context);
+
+      const item = await context.prisma.estimationItem.findUnique({
+        where: { id },
+      });
+
+      if (!item) {
+        throw new Error('Estimation item not found');
+      }
+
+      await context.prisma.estimationItem.delete({
+        where: { id },
+      });
+
+      // Update estimation total amount
+      const estimation = await context.prisma.estimation.findUnique({
+        where: { id: item.estimationId },
+        include: { items: true },
+      });
+
+      if (estimation) {
+        const newTotal = estimation.items.reduce((sum, item) => sum + item.totalPrice, 0);
+        await context.prisma.estimation.update({
+          where: { id: item.estimationId },
+          data: { totalAmount: newTotal },
+        });
+      }
+
+      return true;
     },
   },
 

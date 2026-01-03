@@ -12,6 +12,7 @@ import { otpRouter } from './routes/otp';
 import { webhookRouter } from './routes/webhooks';
 import { smsRouter } from './routes/sms';
 import { uploadRouter } from './routes/upload';
+import estimationRouter from './routes/estimation.routes';
 import { initSlotBookingCron } from './services/slotBooking.service';
 import prisma from './lib/prisma';
 
@@ -27,11 +28,15 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 // Serve static uploaded files
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
+// Serve test connectivity page
+app.use(express.static(path.join(__dirname, '..')));
+
 // REST Routes
 app.use('/api', otpRouter);
 app.use('/api', smsRouter);
 app.use('/api/upload', uploadRouter);
 app.use('/upload', uploadRouter); // Direct upload route
+app.use('/api/estimations', estimationRouter);
 app.use('/webhook', webhookRouter);
 
 // Health check

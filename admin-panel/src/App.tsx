@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { LayoutDashboard, Car, Users, CreditCard, Settings, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Car, Users, CreditCard, Settings, LogOut, Menu, X, FileText } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
+import EstimationsPage from './pages/EstimationsPage';
+import EstimationFormPage from './pages/EstimationFormPage';
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
@@ -32,6 +34,7 @@ function App() {
   const navItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Vehicles', path: '/vehicles', icon: Car },
+    { name: 'Estimations', path: '/estimations', icon: FileText },
     { name: 'Users', path: '/users', icon: Users },
     { name: 'Payments', path: '/payments', icon: CreditCard },
     { name: 'Settings', path: '/settings', icon: Settings },
@@ -62,7 +65,8 @@ function App() {
         <nav className="mt-6">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = location.pathname === item.path;
+            const isActive = location.pathname === item.path || 
+                           (item.path === '/estimations' && location.pathname.startsWith('/estimations'));
             return (
               <Link
                 key={item.path}
@@ -96,6 +100,9 @@ function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/vehicles" element={<div className="p-6">Vehicles Page</div>} />
+          <Route path="/estimations" element={<EstimationsPage />} />
+          <Route path="/estimations/new" element={<EstimationFormPage />} />
+          <Route path="/estimations/:id" element={<EstimationFormPage />} />
           <Route path="/users" element={<div className="p-6">Users Page</div>} />
           <Route path="/payments" element={<div className="p-6">Payments Page</div>} />
           <Route path="/settings" element={<div className="p-6">Settings Page</div>} />

@@ -53,8 +53,35 @@ const upload = multer({
   },
 });
 
+// Configure multer specifically for logo uploads
+const logoStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const fullPath = path.join(uploadsDir, 'logo');
+    
+    if (!fs.existsSync(fullPath)) {
+      fs.mkdirSync(fullPath, { recursive: true });
+    }
+    
+    cb(null, fullPath);
+  },
+  filename: (req, file, cb) => {
+    // Generate unique filename with original extension
+    const uniqueId = crypto.randomBytes(16).toString('hex');
+    const ext = path.extname(file.originalname);
+    cb(null, `${Date.now()}-${uniqueId}${ext}`);
+  },
+});
+
+const logoUpload = multer({
+  storage: logoStorage,
+  fileFilter: imageFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB max file size
+  },
+});
+
 /**
- * Upload logo image (Admin only)
+ * Upload logo image (Staff/Admin only)
  * POST /api/upload/logo
  * Body: multipart/form-data with 'file' field
  * Returns: { url: string }
@@ -67,8 +94,7 @@ const upload = multer({
 router.post(
   '/logo',
   authenticate,
-  requireAdmin,
-  upload.single('file'),
+  logoUpload.single('file'),
   async (req: AuthRequest, res) => {
     try {
       if (!req.file) {
@@ -76,7 +102,15 @@ router.post(
       }
 
       // Construct URL for the uploaded file
-      const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 4000}`;
+      // Use BASE_URL from env, or try to get host from request headers for network access
+      let baseUrl = process.env.BASE_URL;
+      if (!baseUrl && req.headers.host) {
+        const protocol = req.protocol || 'http';
+        baseUrl = `${protocol}://${req.headers.host}`;
+      }
+      if (!baseUrl) {
+        baseUrl = `http://localhost:${process.env.PORT || 4000}`;
+      }
       const fileUrl = `${baseUrl}/uploads/logo/${req.file.filename}`;
 
       res.json({
