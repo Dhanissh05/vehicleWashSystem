@@ -46,7 +46,23 @@ export default function TrackProgressScreen({ navigation, route }: TrackProgress
   const [expandedVehicles, setExpandedVehicles] = React.useState<{[key: string]: boolean}>({});
 
   // Get all active vehicles (not DELIVERED)
-  const activeVehicles = data?.myVehicles?.filter((v: any) => v.status !== 'DELIVERED') || [];
+  // Also filter out vehicles where ALL slot booking services are CANCELLED
+  const activeVehicles = data?.myVehicles?.filter((v: any) => {
+    // Don't show delivered vehicles
+    if (v.status === 'DELIVERED') return false;
+    
+    // If vehicle has slot booking with services
+    if (v.slotBooking?.services && v.slotBooking.services.length > 0) {
+      // Check if ALL services are cancelled
+      const allServicesCancelled = v.slotBooking.services.every(
+        (service: any) => service.status === 'CANCELLED'
+      );
+      // Don't show if all services are cancelled
+      if (allServicesCancelled) return false;
+    }
+    
+    return true;
+  }) || [];
   
   // If vehicleId is provided, show only that vehicle, otherwise show all active vehicles
   const vehiclesToShow = vehicleId 
@@ -131,6 +147,7 @@ export default function TrackProgressScreen({ navigation, route }: TrackProgress
 
   const renderServiceProgress = (service: any) => {
     const isExpanded = expandedServices[service.id] || false;
+    const isCancelled = service.status === 'CANCELLED';
     
     const steps = [
       { status: 'BOOKED', label: 'Booked', icon: '📋' },
@@ -142,16 +159,20 @@ export default function TrackProgressScreen({ navigation, route }: TrackProgress
     const currentStepIndex = steps.findIndex(s => s.status === service.status);
 
     return (
-      <View style={styles.serviceCard}>
+      <View style={[styles.serviceCard, isCancelled && styles.serviceCancelled]}>
         <TouchableOpacity 
           style={styles.serviceHeader}
           onPress={() => toggleService(service.id)}
           activeOpacity={0.7}
         >
           <View style={styles.serviceIconContainer}>
-            <Text style={styles.serviceIcon}>{getServiceIcon(service.serviceType)}</Text>
+            <Text style={[styles.serviceIcon, isCancelled && styles.serviceIconCancelled]}>
+              {isCancelled ? '❌' : getServiceIcon(service.serviceType)}
+            </Text>
             <View style={styles.serviceInfo}>
-              <Text style={styles.serviceName}>{getServiceName(service.serviceType)}</Text>
+              <Text style={[styles.serviceName, isCancelled && styles.serviceNameCancelled]}>
+                {getServiceName(service.serviceType)}
+              </Text>
             </View>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -165,8 +186,8 @@ export default function TrackProgressScreen({ navigation, route }: TrackProgress
           </View>
         </TouchableOpacity>
 
-        {/* Service Progress Steps - Only show when expanded */}
-        {isExpanded && (
+        {/* Service Progress Steps - Only show when expanded and not cancelled */}
+        {isExpanded && !isCancelled && (
           <>
             <View style={styles.serviceSteps}>
               {steps.map((step, index) => {
@@ -980,6 +1001,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#1F2937',
     fontStyle: 'italic',
+  },
+  serviceCancelled: {
+    opacity: 0.7,
+    backgroundColor: '#F9FAFB',
+  },
+  serviceIconCancelled: {
+    opacity: 0.5,
+  },
+  serviceNameCancelled: {
+    textDecorationLine: 'line-through',
+    color: '#9CA3AF',
   },
   emptyIcon: {
     fontSize: 64,
