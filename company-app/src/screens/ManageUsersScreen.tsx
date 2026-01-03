@@ -70,12 +70,25 @@ export default function ManageUsersScreen() {
     return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
   };
 
+  // Remove duplicate vehicles by vehicle number
+  const getUniqueVehicles = (vehicles: any[]) => {
+    const seen = new Set();
+    return vehicles.filter((vehicle: any) => {
+      if (seen.has(vehicle.vehicleNumber)) {
+        return false;
+      }
+      seen.add(vehicle.vehicleNumber);
+      return true;
+    });
+  };
+
   const generatePdfHtml = () => {
     const customers = data?.customers || [];
     
     const tableRows = customers
       .map((customer: any, index: number) => {
-        const vehicles = customer.vehicles
+        const uniqueVehicles = getUniqueVehicles(customer.vehicles);
+        const vehicles = uniqueVehicles
           .map((v: any) => `${v.vehicleNumber} (${v.vehicleType})`)
           .join(', ') || 'None';
         
@@ -311,7 +324,7 @@ export default function ManageUsersScreen() {
                     {customer.vehicles.length === 0 ? (
                       <Text style={styles.noVehiclesText}>No vehicles</Text>
                     ) : (
-                      customer.vehicles.map((vehicle: any) => (
+                      getUniqueVehicles(customer.vehicles).map((vehicle: any) => (
                         <View key={vehicle.id} style={styles.vehicleItem}>
                           <Text style={styles.vehicleNumber}>
                             {vehicle.vehicleNumber}
