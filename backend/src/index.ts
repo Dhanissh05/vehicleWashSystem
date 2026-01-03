@@ -51,7 +51,7 @@ interface Context {
     mobile: string;
     role: string;
     name?: string;
-    centerId?: string;
+    centerId?: string; // Required for estimation creation and filtering
   };
   prisma: PrismaClient;
 }
