@@ -4,9 +4,6 @@ set -e
 echo "Running database cleanup..."
 npx prisma db execute --file=./cleanup-duplicates.sql || echo "Cleanup script failed or no duplicates found, continuing..."
 
-echo "Pre-migration: Adding slug to centers..."
-npx prisma db execute --file=./pre-migrate-slug.sql || echo "Slug update completed or skipped"
-
 echo "Pushing database schema..."
 npx prisma db push --accept-data-loss --skip-generate
 

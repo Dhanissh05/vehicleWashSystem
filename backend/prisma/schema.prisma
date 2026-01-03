@@ -99,7 +99,7 @@ model Center {
   smsCreditExpiry         DateTime? // When SMS credits expire
   
   // Multi-Tenant: Subdomain/Slug for custom branding (optional future use)
-  slug                    String?   @unique // e.g., "rdclean" for rdclean.vehiclewash.app
+  slug                    String?   // e.g., "rdclean" for rdclean.vehiclewash.app (unique constraint to be added after migration)
   
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
