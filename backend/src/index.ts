@@ -51,6 +51,7 @@ interface Context {
     mobile: string;
     role: string;
     name?: string;
+    centerId?: string;
   };
   prisma: PrismaClient;
 }
