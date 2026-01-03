@@ -704,6 +704,32 @@ export const resolvers = {
       return updatedUser;
     },
 
+    // Refresh token - generates new token for authenticated user
+    refreshToken: async (_: any, __: any, context: Context) => {
+      if (!context.user) {
+        throw new Error('Not authenticated');
+      }
+
+      // Fetch latest user data
+      const user = await context.prisma.user.findUnique({
+        where: { id: context.user.id },
+      });
+
+      if (!user || !user.isActive) {
+        throw new Error('User not found or deactivated');
+      }
+
+      // Generate new JWT token with 30 days expiration
+      const signOptions: SignOptions = { expiresIn: '30d' as any };
+      const token = jwt.sign(
+        { id: user.id, mobile: user.mobile, role: user.role },
+        process.env.JWT_SECRET!,
+        signOptions
+      );
+
+      return { token, user };
+    },
+
     // Signup (for new customers with password)
     signup: async (_: any, { input }: any, context: Context) => {
       // Check if user already exists

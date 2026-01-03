@@ -492,6 +492,7 @@ export const typeDefs = gql`
     verifyOtp(mobile: String!, code: String!): AuthPayload!
     signup(input: SignupInput!): AuthPayload!
     login(mobile: String!, password: String!): AuthPayload!
+    refreshToken: AuthPayload!
     updatePassword(mobile: String!, password: String!): User!
     changePassword(input: ChangePasswordInput!): User!
     updateLocation(location: LocationInput!): User!

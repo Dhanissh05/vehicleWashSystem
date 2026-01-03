@@ -10,6 +10,7 @@ import { ActivityIndicator, View, StyleSheet, Alert } from 'react-native';
 import { useVersionChecker } from './src/hooks/useVersionChecker';
 import UpdateChecker from './src/components/UpdateChecker';
 import BookingNotificationListener from './src/components/BookingNotificationListener';
+import { refreshTokenIfNeeded } from './src/utils/tokenRefresh';
 
 // Screens
 import LoginScreen from './src/screens/LoginScreen';
@@ -137,10 +138,20 @@ function AppNavigator() {
 
   React.useEffect(() => {
     checkAuthState();
+    
+    // Setup auto token refresh every 6 hours
+    const refreshInterval = setInterval(() => {
+      refreshTokenIfNeeded(apolloClient);
+    }, 6 * 60 * 60 * 1000);
+    
+    return () => clearInterval(refreshInterval);
   }, []);
 
   const checkAuthState = async () => {
     try {
+      // Attempt to refresh token if needed
+      await refreshTokenIfNeeded(apolloClient);
+      
       const isLoggedIn = await AsyncStorage.getItem('isLoggedIn');
       const isPasscodeSetup = await AsyncStorage.getItem('isPasscodeSetup');
       const token = await AsyncStorage.getItem('token');

@@ -3,11 +3,56 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
+import { useApolloClient, gql } from '@apollo/client';
+
+const REFRESH_TOKEN = gql`
+  mutation RefreshToken {
+    refreshToken {
+      token
+      user {
+        id
+        mobile
+        name
+        role
+      }
+    }
+  }
+`;
 
 export default function PasscodeUnlockScreen({ navigation }: any) {
+  const apolloClient = useApolloClient();
   const [passcode, setPasscode] = useState('');
   const [attempts, setAttempts] = useState(0);
   const maxAttempts = 3;
+
+  const refreshTokenIfNeeded = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) return;
+
+      // Decode token to check expiration
+      const tokenPayload = JSON.parse(atob(token.split('.')[1]));
+      const expiresAt = tokenPayload.exp * 1000;
+      const now = Date.now();
+      const timeUntilExpiry = expiresAt - now;
+      const twoDaysInMs = 2 * 24 * 60 * 60 * 1000;
+
+      // If token expires in less than 2 days, refresh it
+      if (timeUntilExpiry < twoDaysInMs) {
+        console.log('[Passcode] Token expires soon, refreshing...');
+        const { data } = await apolloClient.mutate({ mutation: REFRESH_TOKEN });
+        
+        if (data?.refreshToken?.token) {
+          await AsyncStorage.setItem('token', data.refreshToken.token);
+          await AsyncStorage.setItem('user', JSON.stringify(data.refreshToken.user));
+          console.log('[Passcode] Token refreshed successfully');
+        }
+      }
+    } catch (error) {
+      console.error('[Passcode] Token refresh failed:', error);
+      // Don't block user login, just log the error
+    }
+  };
 
   const handleNumberPress = async (num: string) => {
     if (passcode.length < 4) {
@@ -28,6 +73,8 @@ export default function PasscodeUnlockScreen({ navigation }: any) {
       const storedPasscode = await SecureStore.getItemAsync('app_passcode');
       
       if (enteredPasscode === storedPasscode) {
+        // Refresh token before navigating to dashboard
+        await refreshTokenIfNeeded();
         navigation.replace('Dashboard');
       } else {
         const newAttempts = attempts + 1;
