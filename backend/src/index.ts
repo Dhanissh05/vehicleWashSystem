@@ -51,8 +51,9 @@ interface Context {
     mobile: string;
     role: string;
     name?: string;
-    centerId?: string; // Required for estimation creation and filtering
+    centerId?: string;
   };
+  centerId?: string; // Extracted centerId for multi-tenant isolation
   prisma: PrismaClient;
 }
 
@@ -86,9 +87,43 @@ const startServer = async () => {
       context: async ({ req }): Promise<Context> => {
         const token = req.headers.authorization?.replace('Bearer ', '') || '';
         const user = getUser(token);
+        
+        // Extract centerId for multi-tenant isolation
+        let centerId: string | undefined;
+        
+        if (user && user.userId) {
+          // Fetch user's centerId from database
+          const dbUser = await prisma.user.findUnique({
+            where: { id: user.userId },
+            select: { 
+              id: true,
+              mobile: true,
+              role: true,
+              name: true,
+              centerId: true
+            }
+          });
+          
+          if (dbUser) {
+            centerId = dbUser.centerId || undefined;
+            // Update user object with full data
+            return {
+              user: {
+                id: dbUser.id,
+                mobile: dbUser.mobile,
+                role: dbUser.role,
+                name: dbUser.name || undefined,
+                centerId: dbUser.centerId || undefined
+              },
+              centerId,
+              prisma,
+            };
+          }
+        }
 
         return {
           user,
+          centerId,
           prisma,
         };
       },

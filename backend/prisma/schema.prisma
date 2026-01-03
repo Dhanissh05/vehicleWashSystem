@@ -20,7 +20,7 @@ model User {
   address       String?   // Full address
   city          String?   // City
   pinCode       String?   // 6-digit pin code
-  role          String    @default("CUSTOMER") // UserRole: ADMIN, WORKER, CUSTOMER
+  role          String    @default("CUSTOMER") // UserRole: ADMIN, WORKER, CUSTOMER, SUPER_ADMIN
   password      String?
   isActive      Boolean   @default(true)
   fcmToken      String?   // For push notifications
@@ -30,6 +30,11 @@ model User {
   photoUrl      String?   // Profile photo URL for workers
   biometricEnabled Boolean @default(false) // Biometric login preference
   biometricPublicKey String? // Secure key for biometric authentication
+  
+  // Multi-Tenant: Link user to specific center (ADMIN/WORKER only, CUSTOMER can use any center)
+  centerId      String?
+  center        Center?   @relation(fields: [centerId], references: [id], onDelete: SetNull)
+  
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   
@@ -42,6 +47,7 @@ model User {
   @@index([mobile])
   @@index([role])
   @@index([workerCode])
+  @@index([centerId])
 }
 
 model OtpCode {
@@ -86,13 +92,25 @@ model Center {
   dailySlotsCar           Int       @default(10)  // Total car slots per day
   availableSlotsCar       Int       @default(10)  // Currently available car slots
   isActive                Boolean   @default(true)
+  
+  // Multi-Tenant: SMS Credits & Tracking
+  smsCredits              Int       @default(0)      // Remaining SMS credits
+  totalSmsUsed            Int       @default(0)      // Lifetime SMS usage
+  smsCreditExpiry         DateTime? // When SMS credits expire
+  
+  // Multi-Tenant: Subdomain/Slug for custom branding (optional future use)
+  slug                    String?   @unique // e.g., "rdclean" for rdclean.vehiclewash.app
+  
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
   
   // Relations
+  users         User[]
   vehicles      Vehicle[]
   slotBookings  SlotBooking[]
   estimations   Estimation[]
+  pricing       Pricing[]
+  smsLogs       SmsLog[]
 }
 
 model Vehicle {
@@ -188,6 +206,11 @@ model Pricing {
   price           Float
   description     String?
   isActive        Boolean         @default(true)
+  
+  // Multi-Tenant: Link pricing to specific center
+  centerId        String
+  center          Center          @relation(fields: [centerId], references: [id], onDelete: Cascade)
+  
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   
@@ -197,9 +220,10 @@ model Pricing {
 
   // Note: Unique constraint removed temporarily to allow migration
   // Add back after updating existing pricing categories
-  // @@unique([vehicleType, categoryName])
+  // @@unique([vehicleType, categoryName, centerId])
   @@index([vehicleType])
   @@index([isActive])
+  @@index([centerId])
 }
 
 model SystemConfig {
@@ -324,4 +348,26 @@ model EstimationItem {
   createdAt     DateTime    @default(now())
   
   @@index([estimationId])
+}
+
+// Multi-Tenant: SMS Usage Tracking per Center
+model SmsLog {
+  id            String      @id @default(uuid())
+  centerId      String
+  center        Center      @relation(fields: [centerId], references: [id], onDelete: Cascade)
+  
+  mobile        String      // Recipient phone number
+  message       String      // SMS content
+  status        String      // sent, failed, pending
+  creditsUsed   Int         @default(1)
+  
+  // Optional: Link to booking/vehicle for tracking
+  vehicleId     String?
+  bookingId     String?
+  
+  createdAt     DateTime    @default(now())
+  
+  @@index([centerId])
+  @@index([status])
+  @@index([createdAt])
 }

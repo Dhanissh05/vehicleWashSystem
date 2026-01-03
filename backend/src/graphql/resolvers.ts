@@ -13,6 +13,7 @@ import {
   sendVehicleReadyNotification,
   sendVehicleReceivedNotification,
 } from '../services/fcm.service';
+import { requireCenterId, requireOwnCenter, getCenterIdOptional, isSuperAdmin } from '../middleware/center-isolation';
 
 // Enum-like constants since SQLite doesn't support enums
 const UserRole = {
@@ -72,8 +73,9 @@ interface Context {
     mobile: string;
     role: string;
     name?: string;
-    centerId?: string; // Required for estimation creation and filtering
+    centerId?: string;
   };
+  centerId?: string; // Extracted centerId for multi-tenant isolation
   prisma: PrismaClient;
 }
 
@@ -128,9 +130,11 @@ export const resolvers = {
       context: Context
     ) => {
       requireStaff(context);
+      const centerId = requireCenterId(context);
       
       return await context.prisma.vehicle.findMany({
         where: {
+          centerId,  // Filter by centerId for multi-tenant isolation
           ...(status && { status }),
           ...(vehicleType && { vehicleType }),
         },
@@ -304,16 +308,22 @@ export const resolvers = {
 
     // Get pricing
     pricing: async (_: any, __: any, context: Context) => {
+      const centerId = requireCenterId(context); // Enforce center check
       return await context.prisma.pricing.findMany({
-        where: { isActive: true },
+        where: { 
+          centerId,  // Filter by centerId for multi-tenant isolation
+          isActive: true 
+        },
         orderBy: { vehicleType: 'asc' },
       });
     },
 
     // Get pricing by type
     pricingByType: async (_: any, { vehicleType, carCategory }: any, context: Context) => {
+      const centerId = requireCenterId(context);
       return await context.prisma.pricing.findFirst({
         where: {
+          centerId,  // Filter by centerId
           vehicleType,
           carCategory,
           isActive: true,
@@ -324,9 +334,13 @@ export const resolvers = {
     // Get workers
     workers: async (_: any, __: any, context: Context) => {
       requireAdmin(context);
+      const centerId = requireCenterId(context);
       
       return await context.prisma.user.findMany({
-        where: { role: UserRole.WORKER },
+        where: { 
+          role: UserRole.WORKER,
+          centerId  // Filter by centerId for multi-tenant isolation
+        },
         orderBy: { createdAt: 'desc' },
       });
     },
@@ -416,8 +430,9 @@ export const resolvers = {
 
     slotBookings: async (_: any, { status }: any, context: Context) => {
       requireStaff(context);
+      const centerId = requireCenterId(context);
 
-      const where: any = {};
+      const where: any = { centerId };  // Filter by centerId for multi-tenant isolation
       if (status) {
         where.status = status;
       }
@@ -1476,10 +1491,12 @@ export const resolvers = {
     // Create pricing
     createPricing: async (_: any, { input }: any, context: Context) => {
       requireAdmin(context);
+      const centerId = requireCenterId(context);
       
-      // Check if pricing with same vehicleType and categoryName already exists
+      // Check if pricing with same vehicleType and categoryName already exists for this center
       const existing = await context.prisma.pricing.findFirst({
         where: {
+          centerId,  // Check within the same center
           vehicleType: input.vehicleType,
           categoryName: input.categoryName,
           isActive: true,
@@ -1492,6 +1509,7 @@ export const resolvers = {
 
       return await context.prisma.pricing.create({
         data: {
+          centerId,  // Auto-assign centerId for multi-tenant isolation
           vehicleType: input.vehicleType,
           categoryName: input.categoryName,
           price: input.price,
@@ -1503,6 +1521,16 @@ export const resolvers = {
     // Update pricing
     updatePricing: async (_: any, { input }: any, context: Context) => {
       requireAdmin(context);
+      const centerId = requireCenterId(context);
+      
+      // Verify pricing belongs to user's center
+      const pricing = await context.prisma.pricing.findUnique({
+        where: { id: input.id },
+        select: { centerId: true }
+      });
+      
+      if (!pricing) throw new Error('Pricing not found');
+      requireOwnCenter(context, pricing.centerId);
       
       const updateData: any = {};
       
@@ -1525,6 +1553,16 @@ export const resolvers = {
     // Delete pricing
     deletePricing: async (_: any, { id }: any, context: Context) => {
       requireAdmin(context);
+      const centerId = requireCenterId(context);
+      
+      // Verify pricing belongs to user's center
+      const pricing = await context.prisma.pricing.findUnique({
+        where: { id },
+        select: { centerId: true }
+      });
+      
+      if (!pricing) throw new Error('Pricing not found');
+      requireOwnCenter(context, pricing.centerId);
       
       await context.prisma.pricing.delete({
         where: { id },
@@ -1939,6 +1977,7 @@ export const resolvers = {
     // Create worker (Admin only) - Returns credentials for SMS/display
     createWorker: async (_: any, { input }: any, context: Context) => {
       requireAdmin(context);
+      const centerId = requireCenterId(context);
       
       // Generate worker code if not provided
       const workerCode = input.workerCode || `WRK${Math.floor(1000 + Math.random() * 9000)}`;
@@ -1958,12 +1997,13 @@ export const resolvers = {
           password: hashedPassword,
           role: UserRole.WORKER,
           workerCode,
+          centerId,  // Auto-assign centerId for multi-tenant isolation
         },
       });
 
-      // Get shop name for SMS
-      const center = await context.prisma.center.findFirst({
-        where: { isActive: true },
+      // Get center info for SMS
+      const center = await context.prisma.center.findUnique({
+        where: { id: centerId },
       });
 
       // Send credentials via SMS

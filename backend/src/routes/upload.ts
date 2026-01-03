@@ -13,11 +13,15 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Configure multer for file uploads
+// Configure multer for file uploads with center-based segregation
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
+    const authReq = req as AuthRequest;
+    const centerId = authReq.user?.centerId || 'default';
     const subDir = req.body.type || 'general';
-    const fullPath = path.join(uploadsDir, subDir);
+    
+    // Multi-tenant: Separate folders per center
+    const fullPath = path.join(uploadsDir, centerId, subDir);
     
     if (!fs.existsSync(fullPath)) {
       fs.mkdirSync(fullPath, { recursive: true });
@@ -53,10 +57,14 @@ const upload = multer({
   },
 });
 
-// Configure multer specifically for logo uploads
+// Configure multer specifically for logo uploads with center-based segregation
 const logoStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const fullPath = path.join(uploadsDir, 'logo');
+    const authReq = req as AuthRequest;
+    const centerId = authReq.user?.centerId || 'default';
+    
+    // Multi-tenant: Separate folders per center
+    const fullPath = path.join(uploadsDir, centerId, 'logo');
     
     if (!fs.existsSync(fullPath)) {
       fs.mkdirSync(fullPath, { recursive: true });
@@ -101,6 +109,8 @@ router.post(
         return res.status(400).json({ error: 'No file uploaded' });
       }
 
+      const centerId = req.user?.centerId || 'default';
+
       // Construct URL for the uploaded file
       // Priority: BASE_URL > RAILWAY_PUBLIC_DOMAIN > request headers > localhost
       let baseUrl = process.env.BASE_URL;
@@ -121,7 +131,8 @@ router.post(
         baseUrl = `http://localhost:${process.env.PORT || 4000}`;
       }
       
-      const fileUrl = `${baseUrl}/uploads/logo/${req.file.filename}`;
+      // Multi-tenant: Include centerId in URL path
+      const fileUrl = `${baseUrl}/uploads/${centerId}/logo/${req.file.filename}`;
 
       res.json({
         success: true,
@@ -164,6 +175,9 @@ router.post(
         mimetype: req.file.mimetype
       });
 
+      const centerId = req.user?.centerId || 'default';
+      const subDir = req.body.type || 'general';
+
       let baseUrl = process.env.BASE_URL;
       if (!baseUrl && process.env.RAILWAY_PUBLIC_DOMAIN) {
         baseUrl = `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
@@ -175,7 +189,8 @@ router.post(
       if (!baseUrl) {
         baseUrl = `http://localhost:${process.env.PORT || 4000}`;
       }
-      const fileUrl = `${baseUrl}/uploads/general/${req.file.filename}`;
+      // Multi-tenant: Include centerId in URL path
+      const fileUrl = `${baseUrl}/uploads/${centerId}/${subDir}/${req.file.filename}`;
 
       console.log('Upload successful:', fileUrl);
 
@@ -208,6 +223,8 @@ router.post(
         return res.status(400).json({ error: 'No file uploaded' });
       }
 
+      const centerId = req.user?.centerId || 'default';
+
       let baseUrl = process.env.BASE_URL;
       if (!baseUrl && process.env.RAILWAY_PUBLIC_DOMAIN) {
         baseUrl = `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
@@ -219,7 +236,8 @@ router.post(
       if (!baseUrl) {
         baseUrl = `http://localhost:${process.env.PORT || 4000}`;
       }
-      const fileUrl = `${baseUrl}/uploads/payment/${req.file.filename}`;
+      // Multi-tenant: Include centerId in URL path
+      const fileUrl = `${baseUrl}/uploads/${centerId}/payment/${req.file.filename}`;
 
       res.json({
         success: true,
