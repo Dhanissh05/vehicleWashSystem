@@ -31,9 +31,13 @@ export function usePushNotifications() {
   const [updateFcmToken] = useMutation(UPDATE_FCM_TOKEN);
   const hasRegistered = useRef(false);
   const registrationAttempts = useRef(0);
+  const APP_VERSION = '1.0.0'; // Update this when you want to force re-registration
 
   useEffect(() => {
-    console.log('🔔 [usePushNotifications] Hook initialized');
+    console.log('🔔 [usePushNotifications] Hook initialized (v' + APP_VERSION + ')');
+    
+    // Check if already registered for this app version
+    checkPreviousRegistration();
     
     // Check immediately on mount
     checkAndRegister();
@@ -74,6 +78,22 @@ export function usePushNotifications() {
     };
   }, []);
 
+  async function checkPreviousRegistration() {
+    try {
+      const lastRegisteredVersion = await AsyncStorage.getItem('fcm_registered_version');
+      if (lastRegisteredVersion !== APP_VERSION) {
+        console.log(`🔄 [usePushNotifications] New app version detected (${lastRegisteredVersion} → ${APP_VERSION}), will re-register FCM token`);
+        hasRegistered.current = false;
+        // Clear the flag to force re-registration
+        await AsyncStorage.removeItem('fcm_registered_version');
+      } else {
+        console.log(`✅ [usePushNotifications] Already registered for version ${APP_VERSION}`);
+      }
+    } catch (error) {
+      console.error('⚠️ [usePushNotifications] Error checking previous registration:', error);
+    }
+  }
+
   async function checkAndRegister() {
     registrationAttempts.current++;
     
@@ -96,7 +116,9 @@ export function usePushNotifications() {
     
     if (success) {
       hasRegistered.current = true;
-      console.log('✅ [usePushNotifications] Registration completed and marked successful');
+      // Save the version we registered for
+      await AsyncStorage.setItem('fcm_registered_version', APP_VERSION);
+      console.log('✅ [usePushNotifications] Registration completed and marked successful for version ' + APP_VERSION);
     }
   }
 
