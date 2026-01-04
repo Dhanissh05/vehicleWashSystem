@@ -584,7 +584,7 @@ export default function WashCycleScreen({ navigation }: any) {
                         <Text style={styles.servicePricingText}>
                           {service.pricing.categoryName} - ₹{service.pricing.price}
                         </Text>
-                        {!item.payment && (
+                        {!item.payment && service.status !== 'CANCELLED' && (
                           <View style={styles.servicePricingButtons}>
                             <TouchableOpacity
                               style={styles.changeServicePricingButton}
@@ -632,7 +632,7 @@ export default function WashCycleScreen({ navigation }: any) {
                         <Text style={styles.servicePricingText}>
                           {service.customPricingName || 'Custom'} - ₹{service.customPrice}
                         </Text>
-                        {!item.payment && (
+                        {!item.payment && service.status !== 'CANCELLED' && (
                           <View style={styles.servicePricingButtons}>
                             <TouchableOpacity
                               style={styles.changeServicePricingButton}
@@ -677,16 +677,18 @@ export default function WashCycleScreen({ navigation }: any) {
                         )}
                       </>
                     ) : (
-                      <TouchableOpacity
-                        style={styles.selectServicePricingButton}
-                        onPress={() => {
-                          setSelectedService(service);
-                          setSelectedVehicle(item);
-                          setPricingModalVisible(true);
-                        }}
-                      >
-                        <Text style={styles.selectServicePricingButtonText}>+ Select</Text>
-                      </TouchableOpacity>
+                      service.status !== 'CANCELLED' && (
+                        <TouchableOpacity
+                          style={styles.selectServicePricingButton}
+                          onPress={() => {
+                            setSelectedService(service);
+                            setSelectedVehicle(item);
+                            setPricingModalVisible(true);
+                          }}
+                        >
+                          <Text style={styles.selectServicePricingButtonText}>+ Select</Text>
+                        </TouchableOpacity>
+                      )
                     )}
                   </View>
                   
