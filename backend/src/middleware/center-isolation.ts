@@ -39,15 +39,18 @@ export const requireCenterId = async (context: Context): Promise<string> => {
     });
     
     if (defaultCenter) {
-      console.warn(`⚠️ User ${context.user?.id} has no centerId, using default center ${defaultCenter.id}`);
       centerId = defaultCenter.id;
       
-      // Update user with centerId for next time
+      // Update user with centerId for next time (async, don't block request)
       if (context.user?.id) {
-        await context.prisma.user.update({
+        context.prisma.user.update({
           where: { id: context.user.id },
           data: { centerId: defaultCenter.id }
-        }).catch(err => console.error('Failed to update user centerId:', err));
+        }).then(() => {
+          console.log(`✅ Auto-assigned user ${context.user?.id} to center ${defaultCenter.id}`);
+        }).catch(err => {
+          console.error(`❌ Failed to auto-assign user ${context.user?.id} to center:`, err.message);
+        });
       }
     }
   }
