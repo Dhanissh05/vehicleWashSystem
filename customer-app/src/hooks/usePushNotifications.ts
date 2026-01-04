@@ -150,7 +150,9 @@ export function usePushNotifications() {
       }
 
       if (!Device.isDevice) {
-        console.log('⚠️ [usePushNotifications] Not a physical device, skipping');
+        const msg = '⚠️ Not a physical device, skipping FCM';
+        console.log(msg);
+        Alert.alert('FCM Debug', msg);
         return false;
       }
 
@@ -166,11 +168,14 @@ export function usePushNotifications() {
       }
       
       if (finalStatus !== 'granted') {
-        console.log('❌ [usePushNotifications] Permission denied');
+        const msg = '❌ Notification permission denied';
+        console.log(msg);
+        Alert.alert('FCM Error', `${msg}\n\nPlease enable notifications in Settings → Apps → WashFlow`);
         return false;
       }
       
       try {
+        console.log('📱 [usePushNotifications] Getting Expo Push Token...');
         const tokenData = await Notifications.getExpoPushTokenAsync({
           projectId: 'fd7406bb-f1f5-4e5f-981e-1fd91b5286f2',
         });
@@ -179,18 +184,24 @@ export function usePushNotifications() {
 
         // Send token to backend
         try {
+          console.log('📱 [usePushNotifications] Sending token to backend...');
           const result = await updateFcmToken({ variables: { token } });
           console.log('✅ [usePushNotifications] FCM token registered with backend:', result.data);
+          Alert.alert('FCM Success!', 'Push notifications enabled successfully!');
           return true;
         } catch (error: any) {
-          console.error('❌ [usePushNotifications] Failed to register FCM token:', error.message);
+          const msg = error.message || 'Unknown error';
+          console.error('❌ [usePushNotifications] Failed to register FCM token:', msg);
+          Alert.alert('FCM Backend Error', `Failed to save token: ${msg}\n\nGraphQL: ${error.graphQLErrors?.[0]?.message || 'none'}`);
           if (error.graphQLErrors) {
             console.error('❌ [usePushNotifications] GraphQL errors:', JSON.stringify(error.graphQLErrors));
           }
           return false;
         }
-      } catch (error) {
-        console.error('❌ [usePushNotifications] Error getting push token:', error);
+      } catch (error: any) {
+        const msg = error.message || 'Unknown error';
+        console.error('❌ [usePushNotifications] Error getting push token:', msg);
+        Alert.alert('FCM Token Error', `Failed to get Expo token: ${msg}`);
         return false;
       }
     } catch (error) {
