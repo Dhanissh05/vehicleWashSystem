@@ -176,6 +176,10 @@ export function usePushNotifications() {
       
       try {
         console.log('📱 [usePushNotifications] Getting Expo Push Token...');
+        
+        // Add a small delay to ensure Firebase is ready
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
         const tokenData = await Notifications.getExpoPushTokenAsync({
           projectId: 'fd7406bb-f1f5-4e5f-981e-1fd91b5286f2',
         });
@@ -201,7 +205,17 @@ export function usePushNotifications() {
       } catch (error: any) {
         const msg = error.message || 'Unknown error';
         console.error('❌ [usePushNotifications] Error getting push token:', msg);
-        Alert.alert('FCM Token Error', `Failed to get Expo token: ${msg}`);
+        
+        // Check if it's a Firebase initialization error
+        if (msg.includes('FirebaseApp') || msg.includes('Firebase')) {
+          Alert.alert(
+            'Firebase Setup Required',
+            'Push notifications require a development build with Firebase configured. This error occurs in Expo Go.\n\nTo fix:\n1. Run: cd customer-app && eas build --profile development --platform android\n2. Install the development build\n3. Notifications will work',
+            [{ text: 'OK' }]
+          );
+        } else {
+          Alert.alert('FCM Token Error', `Failed to get Expo token: ${msg}`);
+        }
         return false;
       }
     } catch (error) {
