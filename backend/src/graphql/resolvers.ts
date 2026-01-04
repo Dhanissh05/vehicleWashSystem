@@ -308,10 +308,23 @@ export const resolvers = {
 
     // Get pricing
     pricing: async (_: any, __: any, context: Context) => {
-      const centerId = await requireCenterId(context); // Enforce center check
+      // Allow customers to view pricing without centerId - use first center as default
+      let centerId = getCenterIdOptional(context);
+      
+      if (!centerId) {
+        const defaultCenter = await context.prisma.center.findFirst({
+          orderBy: { createdAt: 'asc' }
+        });
+        centerId = defaultCenter?.id;
+      }
+      
+      if (!centerId) {
+        return [];
+      }
+      
       return await context.prisma.pricing.findMany({
         where: { 
-          centerId,  // Filter by centerId for multi-tenant isolation
+          centerId,
           isActive: true 
         },
         orderBy: { vehicleType: 'asc' },
@@ -320,10 +333,23 @@ export const resolvers = {
 
     // Get pricing by type
     pricingByType: async (_: any, { vehicleType, carCategory }: any, context: Context) => {
-      const centerId = await requireCenterId(context);
+      // Allow customers to view pricing without centerId - use first center as default
+      let centerId = getCenterIdOptional(context);
+      
+      if (!centerId) {
+        const defaultCenter = await context.prisma.center.findFirst({
+          orderBy: { createdAt: 'asc' }
+        });
+        centerId = defaultCenter?.id;
+      }
+      
+      if (!centerId) {
+        return null;
+      }
+      
       return await context.prisma.pricing.findFirst({
         where: {
-          centerId,  // Filter by centerId
+          centerId,
           vehicleType,
           carCategory,
           isActive: true,

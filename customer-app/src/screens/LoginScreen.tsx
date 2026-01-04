@@ -16,8 +16,10 @@ import {
 } from 'react-native';
 import { useMutation, useLazyQuery, useQuery } from '@apollo/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { LOGIN, CHECK_USER_EXISTS, CENTERS, SEND_OTP, VERIFY_OTP, UPDATE_PASSWORD } from '../apollo/queries';
+import { LOGIN, CHECK_USER_EXISTS, CENTERS, SEND_OTP, VERIFY_OTP, UPDATE_PASSWORD, UPDATE_FCM_TOKEN } from '../apollo/queries';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
 
 const { width } = Dimensions.get('window');
 
@@ -43,8 +45,57 @@ export default function LoginScreen({ navigation }: any) {
   const [sendOtp, { loading: sendingOtp }] = useMutation(SEND_OTP);
   const [verifyOtp, { loading: verifyingOtp }] = useMutation(VERIFY_OTP);
   const [updatePassword, { loading: updatingPassword }] = useMutation(UPDATE_PASSWORD);
+  const [updateFcmToken] = useMutation(UPDATE_FCM_TOKEN);
   
   const center = centerData?.centers?.[0];
+
+  // Register for push notifications
+  const registerForPushNotifications = async () => {
+    try {
+      if (!Device.isDevice) {
+        console.log('⚠️ Must use physical device for Push Notifications');
+        return;
+      }
+
+      // Request permissions
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      
+      if (finalStatus !== 'granted') {
+        console.log('❌ Push notification permission denied');
+        return;
+      }
+
+      // Set up Android notification channel
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'default',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#FF231F7C',
+        });
+      }
+
+      // Get Expo Push Token
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId: 'fd7406bb-f1f5-4e5f-981e-1fd91b5286f2',
+      });
+      
+      const token = tokenData.data;
+      console.log('✅ Got Expo Push Token:', token);
+
+      // Send token to backend
+      await updateFcmToken({ variables: { token } });
+      console.log('✅ FCM token registered with backend');
+    } catch (error) {
+      console.error('❌ Error registering push notifications:', error);
+    }
+  };
 
   const handleLogin = async () => {
     if (mobile.length < 10) {
@@ -89,6 +140,10 @@ export default function LoginScreen({ navigation }: any) {
 
         await AsyncStorage.setItem('token', data.login.token);
         await AsyncStorage.setItem('user', JSON.stringify(data.login.user));
+        
+        // Register for push notifications immediately after login
+        registerForPushNotifications();
+        
         navigation.replace('Home');
       }
     } catch (error: any) {

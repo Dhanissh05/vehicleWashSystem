@@ -32,8 +32,15 @@ export function usePushNotifications() {
   const hasRegistered = useRef(false);
 
   useEffect(() => {
-    // Check if user is logged in first
+    // Check if user is logged in and register
     checkAndRegister();
+
+    // Set up interval to check for login status changes
+    const interval = setInterval(() => {
+      if (!hasRegistered.current) {
+        checkAndRegister();
+      }
+    }, 3000); // Check every 3 seconds
 
     // Listen for incoming notifications
     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
@@ -46,6 +53,7 @@ export function usePushNotifications() {
     });
 
     return () => {
+      clearInterval(interval);
       if (notificationListener.current) {
         notificationListener.current.remove();
       }

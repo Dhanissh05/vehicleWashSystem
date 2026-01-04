@@ -8,12 +8,15 @@ import {
   ActivityIndicator,
   Switch,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { useMutation } from '@apollo/client';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { gql } from '@apollo/client';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
 
 const SETUP_BIOMETRIC = gql`
   mutation SetupBiometric($input: BiometricSetupInput!) {
@@ -21,6 +24,12 @@ const SETUP_BIOMETRIC = gql`
       id
       biometricEnabled
     }
+  }
+`;
+
+const UPDATE_FCM_TOKEN = gql`
+  mutation UpdateFcmToken($token: String!) {
+    updateFcmToken(token: $token)
   }
 `;
 
@@ -37,10 +46,59 @@ export default function BiometricSetupScreen({ navigation, route }: BiometricSet
   const [biometricType, setBiometricType] = useState<string>('');
 
   const [setupBiometric, { loading }] = useMutation(SETUP_BIOMETRIC);
+  const [updateFcmToken] = useMutation(UPDATE_FCM_TOKEN);
 
   useEffect(() => {
     checkBiometricAvailability();
   }, []);
+
+  // Register for push notifications
+  const registerForPushNotifications = async () => {
+    try {
+      if (!Device.isDevice) {
+        console.log('⚠️ Must use physical device for Push Notifications');
+        return;
+      }
+
+      // Request permissions
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      
+      if (finalStatus !== 'granted') {
+        console.log('❌ Push notification permission denied');
+        return;
+      }
+
+      // Set up Android notification channel
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'default',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#FF231F7C',
+        });
+      }
+
+      // Get Expo Push Token
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId: 'fd7406bb-f1f5-4e5f-981e-1fd91b5286f2',
+      });
+      
+      const token = tokenData.data;
+      console.log('✅ Got Expo Push Token:', token);
+
+      // Send token to backend
+      await updateFcmToken({ variables: { token } });
+      console.log('✅ FCM token registered with backend');
+    } catch (error) {
+      console.error('❌ Error registering push notifications:', error);
+    }
+  };
 
   const checkBiometricAvailability = async () => {
     try {
@@ -132,6 +190,9 @@ export default function BiometricSetupScreen({ navigation, route }: BiometricSet
       }
     }
 
+    // Register for push notifications after signup
+    registerForPushNotifications();
+
     navigation.reset({
       index: 0,
       routes: [{ name: 'HomeMain' }],
@@ -139,6 +200,9 @@ export default function BiometricSetupScreen({ navigation, route }: BiometricSet
   };
 
   const handleSkip = () => {
+    // Register for push notifications after signup
+    registerForPushNotifications();
+    
     navigation.reset({
       index: 0,
       routes: [{ name: 'HomeMain' }],
