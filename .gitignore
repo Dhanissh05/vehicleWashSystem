@@ -9,9 +9,8 @@ coverage
 *.sqlite
 .expo
 
-# Firebase credentials (NEVER commit)
-google-services.json
-firebase-service-account.json
+# Firebase credentials (NEVER commit the backend service account)
+backend/firebase-service-account.json
 *service-account*.json
 .expo-shared
 build

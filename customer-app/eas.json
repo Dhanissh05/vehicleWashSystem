@@ -20,6 +20,9 @@
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease"
+      },
+      "env": {
+        "GOOGLE_SERVICES_JSON": "./google-services.json"
       }
     }
   },

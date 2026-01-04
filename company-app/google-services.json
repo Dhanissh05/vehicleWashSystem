@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "717539312988",
+    "project_id": "vehiclewash-system",
+    "storage_bucket": "vehiclewash-system.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:717539312988:android:0478c09bcd7bf685f1ed99",
+        "android_client_info": {
+          "package_name": "com.vehiclewash.company"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCa0F_Xchdh3ORPgPBxbdimAcNc100oF8I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
