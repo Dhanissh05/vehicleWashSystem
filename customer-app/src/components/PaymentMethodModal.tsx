@@ -8,8 +8,14 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { useMutation } from '@apollo/client';
+import { useMutation, gql } from '@apollo/client';
 import { CREATE_PAYMENT } from '../apollo/queries';
+
+const DELETE_PAYMENT = gql`
+  mutation DeletePayment($vehicleId: ID!) {
+    deletePayment(vehicleId: $vehicleId)
+  }
+`;
 
 interface PaymentMethodModalProps {
   visible: boolean;
@@ -17,6 +23,7 @@ interface PaymentMethodModalProps {
   vehicleId: string;
   amount: number;
   onPaymentInitiated: (paymentId: string, method: string) => void;
+  existingPayment?: any;
 }
 
 export function PaymentMethodModal({
@@ -25,13 +32,22 @@ export function PaymentMethodModal({
   vehicleId,
   amount,
   onPaymentInitiated,
+  existingPayment,
 }: PaymentMethodModalProps) {
   const [loading, setLoading] = useState(false);
   const [createPayment] = useMutation(CREATE_PAYMENT);
+  const [deletePayment] = useMutation(DELETE_PAYMENT);
 
   const handlePaymentMethod = async (method: 'ONLINE' | 'CASH' | 'GPAY') => {
     try {
       setLoading(true);
+
+      // If there's an existing payment, delete it first
+      if (existingPayment) {
+        await deletePayment({
+          variables: { vehicleId },
+        });
+      }
 
       const { data } = await createPayment({
         variables: {
@@ -64,9 +80,11 @@ export function PaymentMethodModal({
     >
       <View style={styles.overlay}>
         <View style={styles.container}>
-          <Text style={styles.title}>Vehicle Ready for Pickup! 🎉</Text>
+          <Text style={styles.title}>
+            {existingPayment ? 'Change Payment Method 💳' : 'Vehicle Ready for Pickup! 🎉'}
+          </Text>
           <Text style={styles.subtitle}>
-            Please choose your payment method
+            {existingPayment ? 'Select a new payment method' : 'Please choose your payment method'}
           </Text>
           <Text style={styles.amount}>₹{amount}</Text>
 

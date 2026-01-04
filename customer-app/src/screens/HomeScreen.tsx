@@ -489,6 +489,7 @@ export default function HomeScreen({ navigation }: any) {
           visible={paymentModalVisible}
           onClose={() => setPaymentModalVisible(false)}
           vehicleId={selectedVehicle.id}
+          existingPayment={selectedVehicle.payment}
           amount={(() => {
             // Calculate total from service pricing if available
             if (selectedVehicle.slotBooking?.services) {
