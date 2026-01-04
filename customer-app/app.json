@@ -45,7 +45,6 @@
         {
           "android": {
             "newArchEnabled": false,
-            "googleServicesFile": "./google-services.json",
             "usesCleartextTraffic": false
           }
         }
