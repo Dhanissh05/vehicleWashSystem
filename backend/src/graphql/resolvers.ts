@@ -822,19 +822,26 @@ export const resolvers = {
     updateFcmToken: async (_: any, { token }: any, context: Context) => {
       const user = requireAuth(context);
       
+      console.log(`📱 Updating FCM token for user ${user.id}:`, token);
+      
       // Check if user exists in database
       const existingUser = await context.prisma.user.findUnique({
         where: { id: user.id },
       });
 
       if (!existingUser) {
+        console.error(`❌ User ${user.id} not found in database`);
         throw new Error('User not found. Please login again.');
       }
 
-      return await context.prisma.user.update({
+      const updatedUser = await context.prisma.user.update({
         where: { id: user.id },
         data: { fcmToken: token },
       });
+      
+      console.log(`✅ FCM token saved for user ${user.id} (${existingUser.name})`);
+      
+      return updatedUser;
     },
 
     // Change password (authenticated users)
@@ -3104,6 +3111,16 @@ export const resolvers = {
         });
 
         console.log(`📊 Found ${customers.length} customers with FCM tokens`);
+        
+        if (customers.length > 0) {
+          console.log('👥 Customers with tokens:');
+          customers.forEach(c => {
+            console.log(`  - ${c.name} (${c.id}): ${c.fcmToken?.substring(0, 30)}...`);
+          });
+        } else {
+          console.log('⚠️ No customers have FCM tokens registered!');
+          console.log('💡 Users need to login to register for push notifications');
+        }
 
         if (customers.length === 0) {
           return {

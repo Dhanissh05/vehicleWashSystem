@@ -52,6 +52,8 @@ export default function LoginScreen({ navigation }: any) {
   // Register for push notifications
   const registerForPushNotifications = async () => {
     try {
+      console.log('🔔 Starting push notification registration...');
+      
       if (!Device.isDevice) {
         console.log('⚠️ Must use physical device for Push Notifications');
         return;
@@ -61,9 +63,12 @@ export default function LoginScreen({ navigation }: any) {
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
       let finalStatus = existingStatus;
       
+      console.log('📱 Current permission status:', existingStatus);
+      
       if (existingStatus !== 'granted') {
         const { status } = await Notifications.requestPermissionsAsync();
         finalStatus = status;
+        console.log('📱 New permission status:', status);
       }
       
       if (finalStatus !== 'granted') {
@@ -79,9 +84,11 @@ export default function LoginScreen({ navigation }: any) {
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#FF231F7C',
         });
+        console.log('📱 Android notification channel created');
       }
 
       // Get Expo Push Token
+      console.log('🔑 Getting Expo Push Token...');
       const tokenData = await Notifications.getExpoPushTokenAsync({
         projectId: 'fd7406bb-f1f5-4e5f-981e-1fd91b5286f2',
       });
@@ -90,10 +97,12 @@ export default function LoginScreen({ navigation }: any) {
       console.log('✅ Got Expo Push Token:', token);
 
       // Send token to backend
-      await updateFcmToken({ variables: { token } });
-      console.log('✅ FCM token registered with backend');
-    } catch (error) {
+      console.log('📤 Sending token to backend...');
+      const result = await updateFcmToken({ variables: { token } });
+      console.log('✅ FCM token registered with backend:', result);
+    } catch (error: any) {
       console.error('❌ Error registering push notifications:', error);
+      console.error('❌ Error details:', error.message, error.graphQLErrors);
     }
   };
 
@@ -142,7 +151,10 @@ export default function LoginScreen({ navigation }: any) {
         await AsyncStorage.setItem('user', JSON.stringify(data.login.user));
         
         // Register for push notifications immediately after login
-        registerForPushNotifications();
+        // Small delay to ensure AsyncStorage is committed and Apollo client context updates
+        setTimeout(() => {
+          registerForPushNotifications();
+        }, 500);
         
         navigation.replace('Home');
       }
