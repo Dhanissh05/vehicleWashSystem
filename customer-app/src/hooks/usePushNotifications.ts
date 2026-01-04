@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Platform } from 'react-native';
+import { Platform, Alert } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { useMutation, gql } from '@apollo/client';
@@ -41,6 +41,19 @@ export function usePushNotifications() {
     
     // Check immediately on mount
     checkAndRegister();
+    
+    // Debugging: Show alert after 5 seconds if still not registered
+    setTimeout(async () => {
+      if (!hasRegistered.current) {
+        const token = await AsyncStorage.getItem('token');
+        const lastVersion = await AsyncStorage.getItem('fcm_registered_version');
+        Alert.alert(
+          'FCM Debug',
+          `Logged in: ${!!token}\nAttempts: ${registrationAttempts.current}\nLast version: ${lastVersion || 'none'}`,
+          [{ text: 'OK' }]
+        );
+      }
+    }, 5000);
 
     // Set up interval to check for login status changes
     // More aggressive: check every 2 seconds for first minute, then every 10 seconds
