@@ -517,6 +517,43 @@ export const resolvers = {
       return config || { key, value: 'false' };
     },
 
+    // Debug query to check FCM tokens in production
+    debugFcmTokens: async (_: any, __: any, context: Context) => {
+      // Allow any authenticated user to call this
+      requireAuth(context);
+
+      const customers = await context.prisma.user.findMany({
+        where: {
+          role: UserRole.CUSTOMER,
+        },
+        select: {
+          id: true,
+          name: true,
+          mobile: true,
+          fcmToken: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+
+      const customersWithTokens = customers.filter(c => c.fcmToken);
+      const customersWithoutTokens = customers.filter(c => !c.fcmToken);
+
+      return {
+        totalCustomers: customers.length,
+        customersWithTokens: customersWithTokens.length,
+        customersWithoutTokens: customersWithoutTokens.length,
+        users: customers.map(c => ({
+          id: c.id,
+          name: c.name,
+          mobile: c.mobile,
+          hasToken: !!c.fcmToken,
+          tokenPreview: c.fcmToken ? c.fcmToken.substring(0, 40) + '...' : null,
+        })),
+      };
+    },
+
     appVersion: async (_: any, __: any, context: Context) => {
       // Get version configs from database
       const companyVersionConfig = await context.prisma.systemConfig.findUnique({

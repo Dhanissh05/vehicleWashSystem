@@ -3,6 +3,21 @@ import { gql } from 'graphql-tag';
 export const typeDefs = gql`
   scalar DateTime
 
+  type DebugFcmTokensResponse {
+    totalCustomers: Int!
+    customersWithTokens: Int!
+    customersWithoutTokens: Int!
+    users: [DebugUserToken!]!
+  }
+
+  type DebugUserToken {
+    id: ID!
+    name: String
+    mobile: String!
+    hasToken: Boolean!
+    tokenPreview: String
+  }
+
   enum UserRole {
     ADMIN
     WORKER
@@ -484,6 +499,9 @@ export const typeDefs = gql`
     
     # App Version
     appVersion: AppVersion!
+    
+    # Debug: Check FCM tokens
+    debugFcmTokens: DebugFcmTokensResponse!
   }
 
   type Mutation {
