@@ -10,6 +10,7 @@ import {
   Alert,
   Modal,
   TextInput,
+  Linking,
 } from 'react-native';
 import { useQuery, useMutation } from '@apollo/client';
 import { gql } from '@apollo/client';
@@ -208,7 +209,7 @@ export default function WashCycleScreen({ navigation }: any) {
 
   const { data, loading, refetch, error, networkStatus } = useQuery(GET_ACTIVE_VEHICLES, {
     fetchPolicy: 'cache-and-network',
-    pollInterval: error ? 0 : 5000,
+    pollInterval: 5000,
     errorPolicy: 'ignore',
     notifyOnNetworkStatusChange: true,
   });
@@ -518,7 +519,20 @@ export default function WashCycleScreen({ navigation }: any) {
         <View style={styles.cardBody}>
           <View style={styles.infoRow}>
             <Text style={styles.label}>Customer:</Text>
-            <Text style={styles.value}>{item.customer.name || item.customer.mobile}</Text>
+            <View style={styles.customerInfo}>
+              <Text style={styles.value}>{item.customer.name || item.customer.mobile}</Text>
+              <TouchableOpacity
+                style={styles.callButton}
+                onPress={() => {
+                  const phoneNumber = `tel:${item.customer.mobile}`;
+                  Linking.openURL(phoneNumber).catch(() => {
+                    Alert.alert('Error', 'Unable to make call');
+                  });
+                }}
+              >
+                <Text style={styles.callButtonText}>📞 Call</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {item.worker && (
@@ -1469,6 +1483,24 @@ const styles = StyleSheet.create({
   infoRow: {
     flexDirection: 'row',
     marginBottom: 6,
+  },
+  customerInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  callButton: {
+    backgroundColor: '#10B981',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginLeft: 8,
+  },
+  callButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
   },
   label: {
     fontSize: 14,
