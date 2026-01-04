@@ -190,9 +190,7 @@ export default function BiometricSetupScreen({ navigation, route }: BiometricSet
       }
     }
 
-    // Register for push notifications after signup
-    registerForPushNotifications();
-
+    // HomeScreen will handle push notification registration
     navigation.reset({
       index: 0,
       routes: [{ name: 'HomeMain' }],
@@ -200,9 +198,7 @@ export default function BiometricSetupScreen({ navigation, route }: BiometricSet
   };
 
   const handleSkip = () => {
-    // Register for push notifications after signup
-    registerForPushNotifications();
-    
+    // HomeScreen will handle push notification registration
     navigation.reset({
       index: 0,
       routes: [{ name: 'HomeMain' }],

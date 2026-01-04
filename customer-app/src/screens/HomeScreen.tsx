@@ -7,15 +7,26 @@ import {
   TouchableOpacity,
   RefreshControl,
   Alert,
+  Platform,
 } from 'react-native';
-import { useQuery } from '@apollo/client';
+import { useQuery, useMutation, gql } from '@apollo/client';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MY_VEHICLES, CENTERS, PRICING, SYSTEM_CONFIG } from '../apollo/queries';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
 import MenuModal from '../components/CustomDrawer';
 import { PaymentMethodModal } from '../components/PaymentMethodModal';
 import { OnlinePaymentModal } from '../components/OnlinePaymentModal';
 import { Audio } from 'expo-av';
+
+const UPDATE_FCM_TOKEN = gql`
+  mutation UpdateFcmToken($token: String!) {
+    updateFcmToken(token: $token) {
+      id
+    }
+  }
+`;
 
 export default function HomeScreen({ navigation }: any) {
   const [isScreenFocused, setIsScreenFocused] = React.useState(true);
@@ -43,8 +54,77 @@ export default function HomeScreen({ navigation }: any) {
   const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
   const [selectedPaymentId, setSelectedPaymentId] = useState<string>('');
   const playedReadyVehicles = useRef<Set<string>>(new Set());
+  const hasRegisteredPushNotifications = useRef(false);
 
+  const [updateFcmToken] = useMutation(UPDATE_FCM_TOKEN);
   const slotBookingEnabled = configData?.systemConfig?.value === 'true';
+
+  // Register for push notifications on first mount
+  useEffect(() => {
+    const registerPushNotifications = async () => {
+      if (hasRegisteredPushNotifications.current) {
+        return; // Already registered
+      }
+
+      try {
+        console.log('🔔 [HomeScreen] Starting push notification registration...');
+        
+        if (!Device.isDevice) {
+          console.log('⚠️ [HomeScreen] Must use physical device for Push Notifications');
+          return;
+        }
+
+        // Request permissions
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        let finalStatus = existingStatus;
+        
+        console.log('📱 [HomeScreen] Current permission status:', existingStatus);
+        
+        if (existingStatus !== 'granted') {
+          const { status } = await Notifications.requestPermissionsAsync();
+          finalStatus = status;
+          console.log('📱 [HomeScreen] New permission status:', status);
+        }
+        
+        if (finalStatus !== 'granted') {
+          console.log('❌ [HomeScreen] Push notification permission denied');
+          return;
+        }
+
+        // Set up Android notification channel
+        if (Platform.OS === 'android') {
+          await Notifications.setNotificationChannelAsync('default', {
+            name: 'default',
+            importance: Notifications.AndroidImportance.MAX,
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: '#FF231F7C',
+          });
+          console.log('📱 [HomeScreen] Android notification channel created');
+        }
+
+        // Get Expo Push Token
+        console.log('🔑 [HomeScreen] Getting Expo Push Token...');
+        const tokenData = await Notifications.getExpoPushTokenAsync({
+          projectId: 'fd7406bb-f1f5-4e5f-981e-1fd91b5286f2',
+        });
+        
+        const token = tokenData.data;
+        console.log('✅ [HomeScreen] Got Expo Push Token:', token);
+
+        // Send token to backend
+        console.log('📤 [HomeScreen] Sending token to backend...');
+        const result = await updateFcmToken({ variables: { token } });
+        console.log('✅ [HomeScreen] FCM token registered with backend:', result);
+        
+        hasRegisteredPushNotifications.current = true;
+      } catch (error: any) {
+        console.error('❌ [HomeScreen] Error registering push notifications:', error);
+        console.error('❌ [HomeScreen] Error details:', error.message, error.graphQLErrors);
+      }
+    };
+
+    registerPushNotifications();
+  }, []); // Run only once on mount
 
   // Track screen focus state for smart polling
   useFocusEffect(

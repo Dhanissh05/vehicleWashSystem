@@ -150,12 +150,10 @@ export default function LoginScreen({ navigation }: any) {
         await AsyncStorage.setItem('token', data.login.token);
         await AsyncStorage.setItem('user', JSON.stringify(data.login.user));
         
-        // Register for push notifications immediately after login
-        // Small delay to ensure AsyncStorage is committed and Apollo client context updates
-        setTimeout(() => {
-          registerForPushNotifications();
-        }, 500);
+        console.log('🔐 [LoginScreen] Login successful, token saved');
+        console.log('💡 [LoginScreen] Push notification registration will be handled by usePushNotifications hook and HomeScreen');
         
+        // Navigate to home (usePushNotifications hook and HomeScreen will handle push notification registration)
         navigation.replace('Home');
       }
     } catch (error: any) {
