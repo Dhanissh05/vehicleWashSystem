@@ -519,8 +519,8 @@ export const resolvers = {
 
     // Debug query to check FCM tokens in production
     debugFcmTokens: async (_: any, __: any, context: Context) => {
-      // Allow any authenticated user to call this
-      requireAuth(context);
+      // Admin only for security
+      requireAdmin(context);
 
       const customers = await context.prisma.user.findMany({
         where: {
