@@ -1,7 +1,19 @@
 # Multi-stage Dockerfile for Vehicle Wash Backend
 # Optimized for production deployment
 
-# Stage 1: Build
+# Stage 0: Build Admin Panel
+FROM node:20-alpine AS admin-builder
+
+WORKDIR /admin
+COPY admin-company-panel/package*.json ./
+RUN npm ci
+COPY admin-company-panel/ ./
+# Inline env so Vite bakes the production API URL at build time
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+RUN npm run build
+
+# Stage 1: Build Backend
 FROM node:20-alpine AS builder
 
 WORKDIR /app
@@ -42,6 +54,8 @@ WORKDIR /app
 # Copy built files and dependencies from builder
 COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
+# Copy built admin panel
+COPY --from=admin-builder --chown=nodejs:nodejs /admin/dist ./admin-panel-dist
 COPY --from=builder --chown=nodejs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nodejs:nodejs /app/package*.json ./
 COPY --from=builder --chown=nodejs:nodejs /app/cleanup-duplicates.sql ./

@@ -30,7 +30,7 @@ export default function App() {
   return (
     <ApolloProvider client={client}>
       <AuthProvider>
-        <BrowserRouter>
+        <BrowserRouter basename="/admin">
           <Toaster position="top-right" toastOptions={{ duration: 3500 }} />
           <Routes>
             <Route path="/login" element={<Login />} />
