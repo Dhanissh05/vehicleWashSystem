@@ -17,6 +17,10 @@ RUN PRISMA_SKIP_POSTINSTALL_GENERATE=true npm ci && \
 # Copy source code
 COPY . .
 
+# Safety: make default Prisma schema PostgreSQL inside container.
+# This prevents runtime commands that omit --schema from loading local sqlite schema.
+RUN cp ./prisma/schema.prod.prisma ./prisma/schema.prisma
+
 # Generate Prisma Client (using production PostgreSQL schema) and Build TypeScript
 RUN npx prisma generate --schema=./prisma/schema.prod.prisma && npx tsc
 
