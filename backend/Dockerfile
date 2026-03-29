@@ -11,14 +11,14 @@ COPY package*.json ./
 COPY prisma ./prisma/
 
 # Install ALL dependencies (including devDependencies for build)
-RUN npm ci && \
+RUN PRISMA_SKIP_POSTINSTALL_GENERATE=true npm ci && \
     npm cache clean --force
 
 # Copy source code
 COPY . .
 
-# Generate Prisma Client and Build TypeScript (no DB access needed)
-RUN npx prisma generate && npx tsc
+# Generate Prisma Client (using production PostgreSQL schema) and Build TypeScript
+RUN npx prisma generate --schema=./prisma/schema.prod.prisma && npx tsc
 
 # Remove devDependencies after build to reduce size
 RUN npm prune --production
@@ -45,8 +45,8 @@ COPY --from=builder --chown=nodejs:nodejs /app/pre-migrate-slug.sql ./
 COPY --from=builder --chown=nodejs:nodejs /app/quick-migrate.js ./
 COPY --from=builder --chown=nodejs:nodejs /app/start.sh ./
 
-# Generate Prisma Client in production stage
-RUN npx prisma generate
+# Generate Prisma Client in production stage (PostgreSQL)
+RUN npx prisma generate --schema=./prisma/schema.prod.prisma
 
 # Make start script executable
 RUN chmod +x start.sh

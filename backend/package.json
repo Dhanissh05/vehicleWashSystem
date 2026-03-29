@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "prisma generate && tsc",
-    "start": "npx prisma db execute --file=./cleanup-duplicates.sql || true && npx prisma db push --accept-data-loss --skip-generate && node prisma/seed.js && node dist/index.js",
-    "railway:build": "prisma generate && prisma db execute --file=./cleanup-duplicates.sql --schema=./prisma/schema.prisma || prisma generate && prisma db push --accept-data-loss --skip-generate && tsc",
+    "start": "npx prisma db execute --schema=./prisma/schema.prod.prisma --file=./cleanup-duplicates.sql || true && npx prisma db push --schema=./prisma/schema.prod.prisma --accept-data-loss --skip-generate && node prisma/seed.js && node dist/index.js",
+    "railway:build": "prisma generate --schema=./prisma/schema.prod.prisma && prisma db execute --schema=./prisma/schema.prod.prisma --file=./cleanup-duplicates.sql || true && prisma db push --schema=./prisma/schema.prod.prisma --accept-data-loss --skip-generate && tsc",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
