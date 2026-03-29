@@ -1,0 +1,454 @@
+// Production schema for Railway / PostgreSQL deployment
+// Local development uses prisma/schema.prisma (SQLite)
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String  @id @default(uuid())
+  mobile             String  @unique
+  name               String?
+  email              String? @unique
+  dateOfBirth        String? // Date of birth in DD/MM/YYYY format
+  address            String? // Full address
+  city               String? // City
+  pinCode            String? // 6-digit pin code
+  role               String  @default("CUSTOMER") // UserRole: ADMIN, WORKER, CUSTOMER, SUPER_ADMIN
+  password           String?
+  isActive           Boolean @default(true)
+  fcmToken           String? // For push notifications
+  latitude           Float?
+  longitude          Float?
+  workerCode         String? @unique // Unique code for workers
+  photoUrl           String? // Profile photo URL for workers
+  biometricEnabled   Boolean @default(false) // Biometric login preference
+  biometricPublicKey String? // Secure key for biometric authentication
+
+  // Multi-Tenant: Link user to specific center (ADMIN/WORKER only, CUSTOMER can use any center)
+  centerId String?
+  center   Center? @relation(fields: [centerId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  vehicles         Vehicle[] @relation("CustomerVehicles")
+  assignedVehicles Vehicle[] @relation("WorkerVehicles")
+  payments         Payment[]
+  otpCodes         OtpCode[]
+
+  @@index([mobile])
+  @@index([role])
+  @@index([workerCode])
+  @@index([centerId])
+}
+
+model OtpCode {
+  id        String   @id @default(uuid())
+  mobile    String
+  code      String
+  expiresAt DateTime
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user   User?   @relation(fields: [userId], references: [id])
+  userId String?
+
+  @@index([mobile, code])
+}
+
+model ProfileOtp {
+  id        String   @id @default(uuid())
+  type      String // EMAIL or MOBILE
+  value     String // email address or mobile number
+  code      String
+  expiresAt DateTime
+  verified  Boolean  @default(false)
+  userId    String
+  createdAt DateTime @default(now())
+
+  @@index([value, code])
+  @@index([userId])
+}
+
+model Center {
+  id                       String  @id @default(uuid())
+  name                     String
+  address                  String
+  latitude                 Float
+  longitude                Float
+  mobile                   String
+  email                    String?
+  logoUrl                  String? // Company logo URL
+  dailySlotsTwoWheeler     Int     @default(10) // Total two-wheeler slots per day
+  availableSlotsTwoWheeler Int     @default(10) // Currently available two-wheeler slots
+  dailySlotsCar            Int     @default(10) // Total car slots per day
+  availableSlotsCar        Int     @default(10) // Currently available car slots
+  isActive                 Boolean @default(true)
+
+  // Multi-Tenant: SMS Credits & Tracking
+  smsCredits      Int       @default(0) // Remaining SMS credits
+  totalSmsUsed    Int       @default(0) // Lifetime SMS usage
+  smsCreditExpiry DateTime? // When SMS credits expire
+
+  // Multi-Tenant: Subdomain/Slug for custom branding (optional future use)
+  slug String? // e.g., "rdclean" for rdclean.vehiclewash.app
+
+  // Platform Lifecycle
+  status          String    @default("PENDING_APPROVAL") // PENDING_APPROVAL, APPROVED, REJECTED, ACTIVE, LOCKED, REMOVED
+  rejectionReason String?
+  lockedAt        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  users         User[]
+  vehicles      Vehicle[]
+  slotBookings  SlotBooking[]
+  estimations   Estimation[]
+  pricing       Pricing[]
+  smsLogs       SmsLog[]
+  subscriptions CompanySubscription[]
+  invoices      Invoice[]
+  reminderLogs  ReminderLog[]
+  auditLogs     AuditLog[]
+}
+
+model Vehicle {
+  id                     String    @id @default(uuid())
+  vehicleNumber          String
+  vehicleType            String // VehicleType: CAR, TWO_WHEELER
+  carCategory            String? // CarCategory: SEDAN, SUV, HATCHBACK, HYBRID (Only for cars)
+  model                  String?
+  brand                  String?
+  color                  String?
+  photoUrl               String? // Vehicle photo URL
+  serviceType            String    @default("WASH") // ServiceType: WASH, BODY_REPAIR
+  status                 String    @default("REGISTERED") // VehicleStatus: REGISTERED, RECEIVED, WASHING, READY_FOR_PICKUP, DELIVERED (for WASH) or BODY_REPAIR_ASSESSMENT, BODY_REPAIR_IN_PROGRESS, BODY_REPAIR_PAINTING, BODY_REPAIR_COMPLETE, READY_FOR_PICKUP, DELIVERED (for BODY_REPAIR)
+  receivedAt             DateTime?
+  washingAt              DateTime?
+  readyAt                DateTime?
+  deliveredAt            DateTime?
+  bodyRepairAssessmentAt DateTime?
+  bodyRepairInProgressAt DateTime?
+  bodyRepairPaintingAt   DateTime?
+  bodyRepairCompleteAt   DateTime?
+  notes                  String?
+
+  // Pricing
+  pricing   Pricing? @relation(fields: [pricingId], references: [id])
+  pricingId String?
+
+  // Relations
+  customer   User   @relation("CustomerVehicles", fields: [customerId], references: [id])
+  customerId String
+
+  worker   User?   @relation("WorkerVehicles", fields: [workerId], references: [id])
+  workerId String?
+
+  center   Center @relation(fields: [centerId], references: [id])
+  centerId String
+
+  slotBooking   SlotBooking? @relation(fields: [slotBookingId], references: [id])
+  slotBookingId String?
+
+  payment Payment?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([customerId])
+  @@index([workerId])
+  @@index([status])
+  @@index([vehicleType])
+  @@index([receivedAt])
+  @@index([vehicleNumber])
+  @@index([pricingId])
+}
+
+model Payment {
+  id                 String    @id @default(uuid())
+  amount             Float
+  method             String // PaymentMethod: ONLINE, CASH, GPAY, UPI
+  paymentMode        String? // GATEWAY (online) or MANUAL (cash/gpay verified by staff)
+  status             String    @default("PENDING") // PaymentStatus: PENDING, PAID, MANUAL_PENDING, REJECTED, REFUNDED
+  transactionId      String?   @unique
+  razorpayOrderId    String?
+  razorpayPaymentId  String?
+  razorpaySignature  String?
+  instamojoPaymentId String?
+  upiId              String? // For manual UPI/GPay
+  screenshotUrl      String? // For manual payment verification
+  verifiedBy         String? // Worker/Admin ID who verified manual payment
+  verifiedAt         DateTime?
+  notes              String?
+
+  // Relations
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
+  vehicleId String  @unique
+
+  customer   User   @relation(fields: [customerId], references: [id])
+  customerId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([customerId])
+  @@index([status])
+  @@index([method])
+  @@index([createdAt])
+}
+
+model Pricing {
+  id           String  @id @default(uuid())
+  vehicleType  String // VehicleType: CAR, TWO_WHEELER, BODY_REPAIR, PAINTING
+  categoryName String  @default("Standard") // Custom category name (e.g., "Sedan", "Bike Above 150cc", "Full Body Paint")
+  carCategory  String? // CarCategory: SEDAN, SUV, HATCHBACK, HYBRID (Deprecated, kept for backward compatibility)
+  price        Float
+  description  String?
+  isActive     Boolean @default(true)
+
+  // Multi-Tenant: Link pricing to specific center (optional during migration)
+  centerId String?
+  center   Center? @relation(fields: [centerId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  vehicles     Vehicle[]
+  slotServices SlotService[]
+
+  @@index([vehicleType])
+  @@index([isActive])
+  @@index([centerId])
+}
+
+model SystemConfig {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// SMS Templates for customer notifications
+model SmsTemplate {
+  id        String   @id @default(uuid())
+  key       String   @unique // VEHICLE_RECEIVED, VEHICLE_READY, WORKER_CREDENTIALS
+  template  String // Template with placeholders: {CUSTOMER_NAME}, {VEHICLE_NUMBER}, etc.
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SlotBooking {
+  id              String        @id @default(uuid())
+  customerMobile  String
+  customerName    String?
+  vehicleNumber   String
+  vehicleType     String
+  carCategory     String?
+  brand           String?
+  model           String?
+  color           String?
+  photoUrl        String?
+  carWash         Boolean       @default(false)
+  twoWheelerWash  Boolean       @default(false)
+  bodyRepair      Boolean       @default(false)
+  otp             String
+  status          String        @default("PENDING")
+  rejectionReason String?
+  cancelledByRole String?
+  cancelledByName String?
+  cancelledAt     DateTime?
+  verifiedAt      DateTime?
+  verifiedBy      String?
+  centerId        String
+  center          Center        @relation(fields: [centerId], references: [id])
+  services        SlotService[]
+  vehicles        Vehicle[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([customerMobile])
+  @@index([status])
+  @@index([otp])
+}
+
+model SlotService {
+  id                String      @id @default(uuid())
+  slotBookingId     String
+  slotBooking       SlotBooking @relation(fields: [slotBookingId], references: [id], onDelete: Cascade)
+  serviceType       String
+  status            String      @default("BOOKED")
+  pricingId         String?
+  pricing           Pricing?    @relation(fields: [pricingId], references: [id], onDelete: SetNull)
+  customPrice       Float? // Custom price when no pricing category matches
+  customPricingName String? // Custom pricing description
+  startedAt         DateTime?
+  startedBy         String?
+  completedAt       DateTime?
+  completedBy       String?
+  cancelledAt       DateTime?
+  cancelledBy       String?
+  cancelledByRole   String?
+  cancelledByName   String?
+  notes             String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@index([slotBookingId])
+  @@index([status])
+  @@index([serviceType])
+  @@index([pricingId])
+}
+
+model Estimation {
+  id                 String    @id @default(uuid())
+  estimationNumber   String    @unique
+  customerName       String
+  customerMobile     String
+  vehicleNumber      String?
+  vehicleType        String?
+  centerId           String?
+  center             Center?   @relation(fields: [centerId], references: [id], onDelete: SetNull)
+  preparedBy         String // User ID of admin/worker who prepared this
+  preparedByName     String // Name of admin/worker
+  preparedByRole     String // ADMIN or WORKER
+  termsAndConditions String?
+  notes              String?
+  status             String    @default("DRAFT") // DRAFT, SENT, ACCEPTED, REJECTED
+  totalAmount        Float     @default(0)
+  validUntil         DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  // Relations
+  items EstimationItem[]
+
+  @@index([estimationNumber])
+  @@index([customerMobile])
+  @@index([status])
+  @@index([centerId])
+}
+
+model EstimationItem {
+  id           String     @id @default(uuid())
+  estimationId String
+  estimation   Estimation @relation(fields: [estimationId], references: [id], onDelete: Cascade)
+  serviceName  String
+  description  String?
+  quantity     Int        @default(1)
+  unitPrice    Float
+  totalPrice   Float
+  createdAt    DateTime   @default(now())
+
+  @@index([estimationId])
+}
+
+// Multi-Tenant: SMS Usage Tracking per Center
+model SmsLog {
+  id       String @id @default(uuid())
+  centerId String
+  center   Center @relation(fields: [centerId], references: [id], onDelete: Cascade)
+
+  mobile      String // Recipient phone number
+  message     String // SMS content
+  status      String // sent, failed, pending
+  creditsUsed Int    @default(1)
+
+  // Optional: Link to booking/vehicle for tracking
+  vehicleId String?
+  bookingId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([centerId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model CompanySubscription {
+  id              String    @id @default(uuid())
+  centerId        String
+  center          Center    @relation(fields: [centerId], references: [id], onDelete: Cascade)
+  planType        String // e.g., BASIC, PREMIUM, PRO
+  billingCycle    String? // MONTHLY, YEARLY (optional for platform-created subs)
+  startDate       DateTime?
+  dueDate         DateTime
+  gracePeriodDays Int       @default(7)
+  status          String    @default("ACTIVE") // ACTIVE, OVERDUE, LOCKED
+  amount          Float
+
+  invoices Invoice[]
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@index([centerId])
+  @@index([status])
+}
+
+model Invoice {
+  id                 String              @id @default(uuid())
+  centerId           String
+  center             Center              @relation(fields: [centerId], references: [id], onDelete: Cascade)
+  subscriptionId     String
+  subscription       CompanySubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  invoiceNumber      String?             @unique
+  amount             Float
+  dueDate            DateTime?
+  issuedAt           DateTime?
+  paidAt             DateTime?
+  billingPeriodStart DateTime?
+  billingPeriodEnd   DateTime?
+  status             String              @default("PENDING") // PENDING, PAID, OVERDUE, CANCELLED
+  pdfUrl             String?
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@index([centerId])
+  @@index([subscriptionId])
+}
+
+model ReminderLog {
+  id        String   @id @default(uuid())
+  centerId  String
+  center    Center   @relation(fields: [centerId], references: [id], onDelete: Cascade)
+  type      String // BEFORE_DUE, ON_DUE, AFTER_DUE
+  channel   String?  @default("FCM")
+  recipient String // Email or Mobile
+  message   String?
+  success   Boolean  @default(true)
+  sentAt    DateTime @default(now())
+
+  @@index([centerId])
+}
+
+model AuditLog {
+  id            String   @id @default(uuid())
+  centerId      String? // Nullable: some actions are platform-wide (e.g., createPlatformUser)
+  center        Center?  @relation(fields: [centerId], references: [id], onDelete: SetNull)
+  performedBy   String   // User ID (platform admin/employee)
+  performerName String   // Display name for log readability
+  performerRole String   // SUPER_ADMIN, EMPLOYEE
+  action        String   // LOCK_COMPANY, UNLOCK_COMPANY, APPROVE_COMPANY, REJECT_COMPANY, REMOVE_COMPANY, CREATE_SUBSCRIPTION, UPDATE_SUBSCRIPTION, RECORD_PAYMENT, SEND_REMINDER, CREATE_COMPANY, CREATE_PLATFORM_USER, UPDATE_GRACE_PERIOD
+  details       String?  // JSON string with additional context
+  createdAt     DateTime @default(now())
+
+  @@index([centerId])
+  @@index([performedBy])
+  @@index([action])
+  @@index([createdAt])
+}
