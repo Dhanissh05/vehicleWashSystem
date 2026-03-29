@@ -45,6 +45,8 @@ const SlotBookingScreen = ({ navigation }: any) => {
     pollInterval: isScreenFocused ? 10000 : 0, // Smart polling - only when screen is focused
     notifyOnNetworkStatusChange: false,
   });
+  const center = centersData?.centers?.[0];
+  const serviceUnavailable = !centersError && (!center || center.subscriptionStatus === 'EXPIRED' || center.subscriptionStatus === 'LOCKED');
   
   const { data: vehiclesData, loading: vehiclesLoading } = useQuery(MY_VEHICLES, {
     fetchPolicy: 'cache-and-network',
@@ -269,6 +271,11 @@ const SlotBookingScreen = ({ navigation }: any) => {
     // Dismiss keyboard first
     Keyboard.dismiss();
 
+    if (serviceUnavailable) {
+      Alert.alert('Service unavailable.', 'Service unavailable.');
+      return;
+    }
+
     if (!vehicleNumber.trim()) {
       Alert.alert('Error', 'Please enter vehicle number');
       return;
@@ -341,6 +348,18 @@ const SlotBookingScreen = ({ navigation }: any) => {
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
         <Text style={{ fontSize: 18, color: '#EF4444', marginBottom: 16 }}>❌ Error</Text>
         <Text style={{ color: '#666', textAlign: 'center' }}>{centersError.message}</Text>
+      </View>
+    );
+  }
+
+  if (serviceUnavailable) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 24 }]}>
+        <Text style={{ fontSize: 24, marginBottom: 10 }}>⚠️</Text>
+        <Text style={{ fontSize: 20, fontWeight: '700', color: '#1F2937', marginBottom: 8 }}>Service unavailable.</Text>
+        <Text style={{ color: '#6B7280', textAlign: 'center' }}>
+          Service unavailable.
+        </Text>
       </View>
     );
   }

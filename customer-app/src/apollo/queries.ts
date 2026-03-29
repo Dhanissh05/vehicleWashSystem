@@ -228,6 +228,7 @@ export const CENTERS = gql`
       availableSlotsTwoWheeler
       dailySlotsCar
       availableSlotsCar
+      subscriptionStatus
     }
   }
 `;

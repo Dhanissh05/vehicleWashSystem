@@ -30,6 +30,9 @@ const GET_CENTER = gql`
       photoUrl
       role
     }
+    mySubscriptionStatus {
+      status
+    }
   }
 `;
 
@@ -47,6 +50,8 @@ export default function MenuModal({ visible, onClose, navigation }: MenuModalPro
   const slideAnim = useRef(new Animated.Value(0)).current;
   const { data, refetch } = useQuery(GET_CENTER);
   const insets = useSafeAreaInsets();
+  const subscriptionStatus = data?.mySubscriptionStatus?.status;
+  const isRestricted = subscriptionStatus === 'EXPIRED' || subscriptionStatus === 'LOCKED';
   
   const center = data?.centers?.[0];
 
@@ -161,147 +166,183 @@ export default function MenuModal({ visible, onClose, navigation }: MenuModalPro
             removeClippedSubviews={false}
             contentContainerStyle={styles.scrollContent}
           >
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => handleNavigate('Dashboard')}
-            >
-              <Text style={styles.menuIcon}>📊</Text>
-              <Text style={styles.menuText}>Dashboard</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => handleNavigate('AddVehicle')}
-            >
-              <Text style={styles.menuIcon}>🚗</Text>
-              <Text style={styles.menuText}>Entry Vehicle</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => handleNavigate('WashCycle')}
-            >
-              <Text style={styles.menuIcon}>🔄</Text>
-              <Text style={styles.menuText}>Wash Cycle</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => handleNavigate('Slots')}
-            >
-              <Text style={styles.menuIcon}>🎫</Text>
-              <Text style={styles.menuText}>Slot Management</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => handleNavigate('SlotBookings')}
-            >
-              <View style={styles.menuIcon}>
-                <CalendarIcon size={24} />
-              </View>
-              <Text style={styles.menuText}>Slot Bookings</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => handleNavigate('Estimations')}
-            >
-              <Text style={styles.menuIcon}>📄</Text>
-              <Text style={styles.menuText}>Estimations</Text>
-            </TouchableOpacity>
-
-            {userRole === 'WORKER' && (
+            {isRestricted ? (
               <>
+                <View style={styles.restrictedBanner}>
+                  <Text style={styles.restrictedTitle}>Access Restricted</Text>
+                  <Text style={styles.restrictedText}>
+                    Your plan has expired. Please make a payment to continue using services.
+                  </Text>
+                </View>
+
                 <TouchableOpacity
                   style={styles.menuItem}
-                  onPress={() => handleNavigate('WorkerProfile')}
+                  onPress={() => handleNavigate('Subscription')}
                 >
-                  <Text style={styles.menuIcon}>👤</Text>
-                  <Text style={styles.menuText}>My Profile</Text>
+                  <Text style={styles.menuIcon}>🧾</Text>
+                  <Text style={styles.menuText}>Subscription</Text>
                 </TouchableOpacity>
 
-                {/* LOGOUT FOR WORKER */}
                 <TouchableOpacity
-                  style={[styles.menuItem, { 
-                    borderTopWidth: 2, 
-                    borderTopColor: '#EF4444', 
-                    marginTop: 20, 
+                  style={[styles.menuItem, {
+                    borderTopWidth: 2,
+                    borderTopColor: '#EF4444',
+                    marginTop: 20,
                     paddingTop: 20,
                     backgroundColor: '#FEE2E2',
                     paddingBottom: 40
                   }]}
-                  onPress={() => {
-                    console.log('🚪 LOGOUT BUTTON PRESSED (WORKER)!');
-                    handleLogout();
-                  }}
+                  onPress={handleLogout}
                 >
                   <Text style={styles.menuIcon}>🚪</Text>
                   <Text style={[styles.menuText, { color: '#EF4444', fontWeight: '700', fontSize: 18 }]}>LOGOUT</Text>
                 </TouchableOpacity>
               </>
-            )}
-
-            {userRole === 'ADMIN' && (
+            ) : (
               <>
                 <TouchableOpacity
                   style={styles.menuItem}
-                  onPress={() => handleNavigate('Workers')}
+                  onPress={() => handleNavigate('Dashboard')}
                 >
-                  <Text style={styles.menuIcon}>👷</Text>
-                  <Text style={styles.menuText}>Workers</Text>
+                  <Text style={styles.menuIcon}>📊</Text>
+                  <Text style={styles.menuText}>Dashboard</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={styles.menuItem}
-                  onPress={() => handleNavigate('ManageUsers')}
+                  onPress={() => handleNavigate('AddVehicle')}
                 >
-                  <Text style={styles.menuIcon}>👥</Text>
-                  <Text style={styles.menuText}>Manage Users</Text>
+                  <Text style={styles.menuIcon}>🚗</Text>
+                  <Text style={styles.menuText}>Entry Vehicle</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={styles.menuItem}
-                  onPress={() => handleNavigate('Pricing')}
+                  onPress={() => handleNavigate('WashCycle')}
                 >
-                  <Text style={styles.menuIcon}>💰</Text>
-                  <Text style={styles.menuText}>Pricing</Text>
+                  <Text style={styles.menuIcon}>🔄</Text>
+                  <Text style={styles.menuText}>Wash Cycle</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={styles.menuItem}
-                  onPress={() => handleNavigate('PushNotification')}
+                  onPress={() => handleNavigate('Slots')}
                 >
-                  <Text style={styles.menuIcon}>📢</Text>
-                  <Text style={styles.menuText}>Push Notification</Text>
+                  <Text style={styles.menuIcon}>🎫</Text>
+                  <Text style={styles.menuText}>Slot Management</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={styles.menuItem}
-                  onPress={() => handleNavigate('Settings')}
+                  onPress={() => handleNavigate('SlotBookings')}
                 >
-                  <Text style={styles.menuIcon}>⚙️</Text>
-                  <Text style={styles.menuText}>Settings</Text>
+                  <View style={styles.menuIcon}>
+                    <CalendarIcon size={24} />
+                  </View>
+                  <Text style={styles.menuText}>Slot Bookings</Text>
                 </TouchableOpacity>
 
-                {/* LOGOUT FOR ADMIN */}
                 <TouchableOpacity
-                  style={[styles.menuItem, { 
-                    borderTopWidth: 2, 
-                    borderTopColor: '#EF4444', 
-                    marginTop: 20, 
-                    paddingTop: 20,
-                    backgroundColor: '#FEE2E2',
-                    paddingBottom: 40
-                  }]}
-                  onPress={() => {
-                    console.log('🚪 LOGOUT BUTTON PRESSED (ADMIN)!');
-                    handleLogout();
-                  }}
+                  style={styles.menuItem}
+                  onPress={() => handleNavigate('Estimations')}
                 >
-                  <Text style={styles.menuIcon}>🚪</Text>
-                  <Text style={[styles.menuText, { color: '#EF4444', fontWeight: '700', fontSize: 18 }]}>LOGOUT</Text>
+                  <Text style={styles.menuIcon}>📄</Text>
+                  <Text style={styles.menuText}>Estimations</Text>
                 </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => handleNavigate('Subscription')}
+                >
+                  <Text style={styles.menuIcon}>🧾</Text>
+                  <Text style={styles.menuText}>Subscription</Text>
+                </TouchableOpacity>
+
+                {userRole === 'WORKER' && (
+                  <>
+                    <TouchableOpacity
+                      style={styles.menuItem}
+                      onPress={() => handleNavigate('WorkerProfile')}
+                    >
+                      <Text style={styles.menuIcon}>👤</Text>
+                      <Text style={styles.menuText}>My Profile</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.menuItem, {
+                        borderTopWidth: 2,
+                        borderTopColor: '#EF4444',
+                        marginTop: 20,
+                        paddingTop: 20,
+                        backgroundColor: '#FEE2E2',
+                        paddingBottom: 40
+                      }]}
+                      onPress={handleLogout}
+                    >
+                      <Text style={styles.menuIcon}>🚪</Text>
+                      <Text style={[styles.menuText, { color: '#EF4444', fontWeight: '700', fontSize: 18 }]}>LOGOUT</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+
+                {userRole === 'ADMIN' && (
+                  <>
+                    <TouchableOpacity
+                      style={styles.menuItem}
+                      onPress={() => handleNavigate('Workers')}
+                    >
+                      <Text style={styles.menuIcon}>👷</Text>
+                      <Text style={styles.menuText}>Workers</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.menuItem}
+                      onPress={() => handleNavigate('ManageUsers')}
+                    >
+                      <Text style={styles.menuIcon}>👥</Text>
+                      <Text style={styles.menuText}>Manage Users</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.menuItem}
+                      onPress={() => handleNavigate('Pricing')}
+                    >
+                      <Text style={styles.menuIcon}>💰</Text>
+                      <Text style={styles.menuText}>Pricing</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.menuItem}
+                      onPress={() => handleNavigate('PushNotification')}
+                    >
+                      <Text style={styles.menuIcon}>📢</Text>
+                      <Text style={styles.menuText}>Push Notification</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.menuItem}
+                      onPress={() => handleNavigate('Settings')}
+                    >
+                      <Text style={styles.menuIcon}>⚙️</Text>
+                      <Text style={styles.menuText}>Settings</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.menuItem, {
+                        borderTopWidth: 2,
+                        borderTopColor: '#EF4444',
+                        marginTop: 20,
+                        paddingTop: 20,
+                        backgroundColor: '#FEE2E2',
+                        paddingBottom: 40
+                      }]}
+                      onPress={handleLogout}
+                    >
+                      <Text style={styles.menuIcon}>🚪</Text>
+                      <Text style={[styles.menuText, { color: '#EF4444', fontWeight: '700', fontSize: 18 }]}>LOGOUT</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
               </>
             )}
           </ScrollView>
@@ -382,6 +423,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#374151',
     fontWeight: '500',
+  },
+  restrictedBanner: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    backgroundColor: '#FEF2F2',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  restrictedTitle: {
+    color: '#991B1B',
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  restrictedText: {
+    color: '#7F1D1D',
+    fontSize: 12,
+    lineHeight: 18,
   },
   logoutSection: {
     borderTopWidth: 1,

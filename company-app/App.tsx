@@ -31,6 +31,8 @@ import PushNotificationScreen from './src/screens/PushNotificationScreen';
 import ManageUsersScreen from './src/screens/ManageUsersScreen';
 import EstimationsScreen from './src/screens/EstimationsScreen';
 import EstimationFormScreen from './src/screens/EstimationFormScreen';
+import SubscriptionScreen from './src/screens/SubscriptionScreen';
+import { withSubscriptionGuard } from './src/components/SubscriptionGuard';
 
 const Stack = createStackNavigator();
 
@@ -125,6 +127,26 @@ const apolloClient = new ApolloClient({
       errorPolicy: 'all',
     },
   },
+});
+
+const GuardedDashboardScreen = withSubscriptionGuard(DashboardScreen);
+const GuardedAddVehicleScreen = withSubscriptionGuard(AddVehicleScreen);
+const GuardedWashCycleScreen = withSubscriptionGuard(WashCycleScreen);
+const GuardedBodyRepairCycleScreen = withSubscriptionGuard(BodyRepairCycleScreen);
+const GuardedWorkersScreen = withSubscriptionGuard(WorkersScreen);
+const GuardedPricingScreen = withSubscriptionGuard(PricingScreen);
+const GuardedSettingsScreen = withSubscriptionGuard(SettingsScreen);
+const GuardedSlotsScreen = withSubscriptionGuard(SlotsScreen);
+const GuardedWorkerProfileScreen = withSubscriptionGuard(WorkerProfileScreen);
+const GuardedSlotBookingsScreen = withSubscriptionGuard(SlotBookingsScreen);
+const GuardedSlotBookingDetailScreen = withSubscriptionGuard(SlotBookingDetailScreen);
+const GuardedPushNotificationScreen = withSubscriptionGuard(PushNotificationScreen);
+const GuardedManageUsersScreen = withSubscriptionGuard(ManageUsersScreen);
+const GuardedEstimationsScreen = withSubscriptionGuard(EstimationsScreen);
+const GuardedEstimationFormScreen = withSubscriptionGuard(EstimationFormScreen);
+const GuardedSubscriptionScreen = withSubscriptionGuard(SubscriptionScreen, {
+  allowRestricted: true,
+  showOverdueBanner: false,
 });
 
 function AppNavigator() {
@@ -232,21 +254,22 @@ function AppNavigator() {
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
         <Stack.Screen name="PasscodeSetup" component={PasscodeSetupScreen} options={{ headerShown: false }} />
         <Stack.Screen name="PasscodeUnlock" component={PasscodeUnlockScreen} options={{ headerShown: false }} />
-        <Stack.Screen name="Dashboard" component={DashboardScreen} />
-        <Stack.Screen name="AddVehicle" component={AddVehicleScreen} options={{ title: 'Entry Vehicle' }} />
-        <Stack.Screen name="WashCycle" component={WashCycleScreen} options={{ headerShown: false }} />
-        <Stack.Screen name="BodyRepairCycle" component={BodyRepairCycleScreen} options={{ headerShown: false }} />
-        <Stack.Screen name="Workers" component={WorkersScreen} />
-        <Stack.Screen name="Pricing" component={PricingScreen} />
-        <Stack.Screen name="Slots" component={SlotsScreen} options={{ title: 'Slot Management' }} />
-        <Stack.Screen name="SlotBookings" component={SlotBookingsScreen} options={{ title: 'Slot Bookings' }} />
-        <Stack.Screen name="SlotBookingDetail" component={SlotBookingDetailScreen} options={{ headerShown: false }} />
-        <Stack.Screen name="ManageUsers" component={ManageUsersScreen} options={{ title: 'Manage Users' }} />
-        <Stack.Screen name="PushNotification" component={PushNotificationScreen} options={{ title: 'Push Notification' }} />
-        <Stack.Screen name="Estimations" component={EstimationsScreen} options={{ title: 'Estimations' }} />
-        <Stack.Screen name="EstimationForm" component={EstimationFormScreen} options={{ headerShown: false }} />
-        <Stack.Screen name="Settings" component={SettingsScreen} />
-        <Stack.Screen name="WorkerProfile" component={WorkerProfileScreen} options={{ title: 'My Profile' }} />
+        <Stack.Screen name="Dashboard" component={GuardedDashboardScreen} />
+        <Stack.Screen name="AddVehicle" component={GuardedAddVehicleScreen} options={{ title: 'Entry Vehicle' }} />
+        <Stack.Screen name="WashCycle" component={GuardedWashCycleScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="BodyRepairCycle" component={GuardedBodyRepairCycleScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="Workers" component={GuardedWorkersScreen} />
+        <Stack.Screen name="Pricing" component={GuardedPricingScreen} />
+        <Stack.Screen name="Slots" component={GuardedSlotsScreen} options={{ title: 'Slot Management' }} />
+        <Stack.Screen name="SlotBookings" component={GuardedSlotBookingsScreen} options={{ title: 'Slot Bookings' }} />
+        <Stack.Screen name="SlotBookingDetail" component={GuardedSlotBookingDetailScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="ManageUsers" component={GuardedManageUsersScreen} options={{ title: 'Manage Users' }} />
+        <Stack.Screen name="PushNotification" component={GuardedPushNotificationScreen} options={{ title: 'Push Notification' }} />
+        <Stack.Screen name="Estimations" component={GuardedEstimationsScreen} options={{ title: 'Estimations' }} />
+        <Stack.Screen name="EstimationForm" component={GuardedEstimationFormScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="Settings" component={GuardedSettingsScreen} />
+        <Stack.Screen name="WorkerProfile" component={GuardedWorkerProfileScreen} options={{ title: 'My Profile' }} />
+        <Stack.Screen name="Subscription" component={GuardedSubscriptionScreen} options={{ title: 'Subscription' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

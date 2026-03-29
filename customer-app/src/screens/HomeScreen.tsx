@@ -58,6 +58,10 @@ export default function HomeScreen({ navigation }: any) {
 
   const [updateFcmToken] = useMutation(UPDATE_FCM_TOKEN);
   const slotBookingEnabled = configData?.systemConfig?.value === 'true';
+  const currentCenter = centerData?.centers?.[0];
+  const serviceUnavailable =
+    !centerError &&
+    (!currentCenter || currentCenter.subscriptionStatus === 'EXPIRED' || currentCenter.subscriptionStatus === 'LOCKED');
 
   // Register for push notifications on first mount
   useEffect(() => {
@@ -437,6 +441,12 @@ export default function HomeScreen({ navigation }: any) {
         <Text style={styles.subtitle}>Track your vehicle wash status</Text>
       </View>
 
+      {serviceUnavailable && (
+        <View style={styles.serviceUnavailableBanner}>
+          <Text style={styles.serviceUnavailableText}>Service unavailable.</Text>
+        </View>
+      )}
+
       {/* Slot Availability Banner */}
       <View style={styles.slotBanner}>
         {centerData?.centers?.[0] ? (
@@ -524,7 +534,7 @@ export default function HomeScreen({ navigation }: any) {
         ) : (
           <View style={styles.slotAvailableBanner}>
             <Text style={styles.slotAvailableTitle}>
-              {centerError ? `Error: ${centerError.message}` : 'Loading slot information...'}
+              {centerError ? `Error: ${centerError.message}` : serviceUnavailable ? 'Service unavailable.' : 'Loading slot information...'}
             </Text>
           </View>
         )}
@@ -554,8 +564,15 @@ export default function HomeScreen({ navigation }: any) {
               </>
             )}
             <TouchableOpacity 
-              style={styles.addButton}
-              onPress={() => navigation.navigate('AddVehicle')}
+              style={[styles.addButton, serviceUnavailable && styles.addButtonDisabled]}
+              disabled={serviceUnavailable}
+              onPress={() => {
+                if (serviceUnavailable) {
+                  Alert.alert('Service unavailable.', 'Service unavailable.');
+                  return;
+                }
+                navigation.navigate('AddVehicle');
+              }}
             >
               <Text style={styles.addButtonText}>Add Your First Vehicle</Text>
             </TouchableOpacity>
@@ -702,6 +719,21 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     color: '#6B7280',
+  },
+  serviceUnavailableBanner: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    backgroundColor: '#FEE2E2',
+    borderLeftWidth: 4,
+    borderLeftColor: '#DC2626',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  serviceUnavailableText: {
+    color: '#991B1B',
+    fontSize: 16,
+    fontWeight: '700',
   },
   slotBanner: {
     marginHorizontal: 16,
@@ -989,6 +1021,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 12,
     marginTop: 8,
+  },
+  addButtonDisabled: {
+    opacity: 0.45,
   },
   addButtonText: {
     color: '#fff',
