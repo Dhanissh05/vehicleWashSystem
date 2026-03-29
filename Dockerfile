@@ -33,8 +33,8 @@ COPY backend/ .
 # This prevents runtime commands that omit --schema from loading the local sqlite schema.
 RUN cp ./prisma/schema.prod.prisma ./prisma/schema.prisma
 
-# Generate Prisma Client (using production PostgreSQL schema) and Build TypeScript
-RUN npx prisma generate --schema=./prisma/schema.prod.prisma && npx tsc
+# Generate Prisma Client (using production PostgreSQL schema)
+RUN npx prisma generate --schema=./prisma/schema.prod.prisma
 
 # Remove devDependencies after build to reduce size
 RUN npm prune --production
