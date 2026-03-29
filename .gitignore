@@ -24,6 +24,10 @@ build
 # HTML strategy files
 PRICING_STRATEGY.html
 
+# Backend runtime build is required in this repo (backend/src is a shim)
+!backend/dist/
+!backend/dist/**
+
 # Documentation files - setup guides
 PUSH_NOTIFICATION_FIX.md
 SOUND_NOTIFICATION_SETUP.md
