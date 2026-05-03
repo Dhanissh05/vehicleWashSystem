@@ -378,17 +378,43 @@ model SmsLog {
   @@index([createdAt])
 }
 
+model SubscriptionPlan {
+  id              String   @id @default(uuid())
+  planName        String   @unique
+  price           Float
+  billingCycle    String   // MONTHLY, YEARLY, LIFETIME
+  validityDays    Int?     // 30 for MONTHLY, 365 for YEARLY, null for LIFETIME
+  gracePeriodDays Int      @default(7)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  subscriptions CompanySubscription[]
+
+  @@index([billingCycle])
+  @@index([isActive])
+}
+
 model CompanySubscription {
-  id              String    @id @default(uuid())
+  id              String   @id @default(uuid())
   centerId        String
-  center          Center    @relation(fields: [centerId], references: [id], onDelete: Cascade)
-  planType        String // e.g., BASIC, PREMIUM, PRO
-  billingCycle    String? // MONTHLY, YEARLY (optional for platform-created subs)
-  startDate       DateTime?
-  dueDate         DateTime
-  gracePeriodDays Int       @default(7)
-  status          String    @default("ACTIVE") // ACTIVE, OVERDUE, LOCKED
-  amount          Float
+  center          Center   @relation(fields: [centerId], references: [id], onDelete: Cascade)
+  
+  // Link to plan template
+  planId          String
+  plan            SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  
+  // Subscription details
+  status          String   @default("ACTIVE") // ACTIVE, OVERDUE, EXPIRED, LOCKED
+  startDate       DateTime @default(now())
+  nextDueDate     DateTime? // null for LIFETIME
+  gracePeriodDays Int      @default(7)
+  lockedByAdmin   Boolean  @default(false) // Manual lock
+  
+  // Previous plan for switching tracking
+  previousPlanId  String?
+  previousStatus  String? // Track status before switch
 
   invoices Invoice[]
 
@@ -396,7 +422,9 @@ model CompanySubscription {
   createdAt DateTime @default(now())
 
   @@index([centerId])
+  @@index([planId])
   @@index([status])
+  @@index([nextDueDate])
 }
 
 model Invoice {
@@ -405,35 +433,52 @@ model Invoice {
   center             Center              @relation(fields: [centerId], references: [id], onDelete: Cascade)
   subscriptionId     String
   subscription       CompanySubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  
+  // Invoice details
   invoiceNumber      String?             @unique
+  planName           String? // Snapshot of plan name at invoice time
   amount             Float
-  dueDate            DateTime?
-  issuedAt           DateTime?
+  
+  // Billing period
+  billingPeriodStart DateTime
+  billingPeriodEnd   DateTime
+  
+  // Payment tracking
+  dueDate            DateTime
+  issuedAt           DateTime @default(now())
   paidAt             DateTime?
-  billingPeriodStart DateTime?
-  billingPeriodEnd   DateTime?
-  status             String              @default("PENDING") // PENDING, PAID, OVERDUE, CANCELLED
+  
+  // Status
+  status             String   @default("PENDING") // PENDING, PAID, OVERDUE, CANCELLED
   pdfUrl             String?
+  paymentMethod      String?  // ONLINE, CASH, etc.
+  paymentNotes       String?
 
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
 
   @@index([centerId])
   @@index([subscriptionId])
+  @@index([status])
+  @@index([dueDate])
 }
 
 model ReminderLog {
   id        String   @id @default(uuid())
   centerId  String
   center    Center   @relation(fields: [centerId], references: [id], onDelete: Cascade)
-  type      String // BEFORE_DUE, ON_DUE, AFTER_DUE
-  channel   String?  @default("FCM")
-  recipient String // Email or Mobile
-  message   String?
+  type      String   // BEFORE_DUE, ON_DUE, AFTER_DUE, AFTER_EXPIRY
+  channel   String   @default("FCM") // FCM, EMAIL, SMS
+  recipient String   // Email or Mobile
+  subject   String? // For email reminders
+  message   String   // Reminder message body
   success   Boolean  @default(true)
+  errorMsg  String?  // Error details if failed
   sentAt    DateTime @default(now())
 
   @@index([centerId])
+  @@index([type])
+  @@index([sentAt])
 }
 
 model AuditLog {
