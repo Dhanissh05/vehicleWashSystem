@@ -1041,6 +1041,32 @@ exports.resolvers = {
                     center: true,
                 },
             });
+        if (isStaff && vehicle) {
+            await context.prisma.slotBooking.create({
+                data: {
+                    customerMobile: input.customerMobile,
+                    customerName: input.customerName,
+                    vehicleNumber: input.vehicleNumber,
+                    vehicleType: input.vehicleType,
+                    carCategory: input.carCategory,
+                    brand: input.brand,
+                    model: input.model,
+                    color: input.color,
+                    otp: String.fromCharCode(77,65,78,85,65,76),
+                    status: String.fromCharCode(86,69,82,73,70,73,69,68),
+                    verifiedAt: new Date(),
+                    verifiedBy: context.user.id,
+                    centerId: input.centerId,
+                    services: {
+                        create: {
+                            serviceType: input.vehicleType === String.fromCharCode(84,87,79,95,87,72,69,69,76,69,82) ? String.fromCharCode(84,87,79,95,87,72,69,69,76,69,82,95,87,65,83,72) : String.fromCharCode(67,65,82,95,87,65,83,72),
+                            status: String.fromCharCode(66,79,79,75,69,68)
+                        }
+                    },
+                    vehicles: { connect: { id: vehicle.id } }
+                }
+            });
+        }
             // Send SMS notification only if staff added the vehicle (actually received)
             if (isStaff && customerData.name && center?.name) {
                 await (0, sms_service_1.sendVehicleReceivedSms)(customerData.mobile, customerData.name, vehicle.vehicleNumber, center.name);

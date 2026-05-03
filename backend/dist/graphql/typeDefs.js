@@ -55,6 +55,7 @@ exports.typeDefs = (0, graphql_tag_1.gql) `
   }
 
   enum PaymentStatus {
+    ISSUED
     PENDING
     PAID
     MANUAL_PENDING
@@ -677,6 +678,7 @@ exports.typeDefs = (0, graphql_tag_1.gql) `
   }
 
   enum InvoiceStatus {
+    ISSUED
     PENDING
     PAID
     OVERDUE

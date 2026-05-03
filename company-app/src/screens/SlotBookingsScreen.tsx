@@ -166,12 +166,18 @@ export default function SlotBookingsScreen({ navigation }: any) {
     }
   };
 
-  const { data, loading, refetch, error } = useQuery(SLOT_BOOKINGS, {
+  const { data, loading, refetch, error, stopPolling } = useQuery(SLOT_BOOKINGS, {
     variables: { status: filter === 'ALL' ? null : filter },
     fetchPolicy: 'cache-first',
-    pollInterval: error ? 0 : 3000, // Stop polling if there's an error
+    pollInterval: 3000,
     errorPolicy: 'ignore',
   });
+
+  useEffect(() => {
+    if (error && stopPolling) {
+      stopPolling();
+    }
+  }, [error, stopPolling]);
 
   // Note: Sound notification is handled globally by BookingNotificationListener component
 

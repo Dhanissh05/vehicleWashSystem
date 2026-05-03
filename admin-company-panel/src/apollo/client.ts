@@ -31,7 +31,7 @@ const errorLink = onError(({ graphQLErrors, networkError }) => {
       if (message === 'Not authenticated' || message.includes('Platform access required')) {
         localStorage.removeItem('platform_token');
         localStorage.removeItem('platform_user');
-        window.location.href = '/login';
+        window.location.href = '/admin/login';
       }
     });
     setTimeout(() => { errorLogged = false; }, 1000);
